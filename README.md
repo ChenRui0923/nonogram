@@ -45,7 +45,44 @@ python3 main.py screenshot.png --debug
 python3 main.py puzzle.json
 ```
 
-### 3. 启动本地 Web 版
+### 3. 打包成 Windows / macOS 应用
+
+需要在目标系统上构建（PyInstaller 不能跨平台生成原生应用）。首次构建会安装打包依赖：
+
+```bash
+# Windows（PowerShell，推荐）
+Set-ExecutionPolicy -Scope Process Bypass
+.\build_windows.ps1
+# 或直接双击 build_windows.bat
+build_windows.bat
+# 输出 dist\\Nonogram.exe；双击后显示独立应用窗口
+
+# macOS
+chmod +x build_macos.sh
+./build_macos.sh
+# 输出 dist/Nonogram.app；双击后显示独立应用窗口
+```
+
+应用启动后会在本机运行 HTTP 服务，并在应用内显示界面。如端口被占用，
+可以从命令行启动并指定端口，例如 `Nonogram.exe --port 9000`。
+
+Windows 版本使用 Microsoft Edge WebView2。Windows 11 通常已自带；Windows 10
+如果没有，需要先安装 WebView2 Runtime。应用内置 WebView 窗口，不依赖外部浏览器。
+
+macOS 应用使用系统 WebKit。macOS 版本需要在 macOS 上构建，Windows 版本需要在
+Windows 上构建；PyInstaller 不负责跨平台交叉编译。构建产物不需要目标机器安装 Python。
+
+启动应用后，直接复制一张 Nonogram 截图，在网页中点击“📋 从剪贴板粘贴”，然后点击
+“开始识别”。macOS 版本通过原生 NSPasteboard 读取剪贴板，Windows 版本通过 Pillow
+读取系统剪贴板，不依赖浏览器剪贴板授权。
+
+若 macOS 首次打开被系统拦截：在 Finder 中右键 `Nonogram.app`，选择“打开”；或执行：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Nonogram.app
+```
+
+### 4. 启动本地 Web 版
 
 Web 版不依赖 Flask/FastAPI，使用 Python 标准库提供本地 HTTP 服务：
 

@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import sys
 import tempfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
@@ -18,7 +19,10 @@ from solver import Solver, UNKNOWN
 
 HOST = "127.0.0.1"
 PORT = 8765
-ROOT = os.path.dirname(os.path.abspath(__file__))
+# In a PyInstaller bundle resources are unpacked under ``sys._MEIPASS``.
+# Keep source-tree execution working while allowing web_index.html to be
+# included as a bundled data file.
+ROOT = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 
 
 def collect_hints(current, solution, rows, cols):

@@ -63,6 +63,7 @@
   <main>
     <div class="toolbar">
       <label class="upload">📷 选择图片<input id="file" type="file" accept="image/*"></label>
+      <button id="paste" type="button">📋 从剪贴板粘贴</button>
       <button id="run" disabled>开始识别</button>
       <button id="download" disabled>下载 JSON</button>
       <span id="filename" class="status">尚未选择图片</span>
@@ -90,6 +91,32 @@
   </main>
   <script>
     const file = document.querySelector('#file'), run = document.querySelector('#run');
+    document.querySelector('#paste').addEventListener('click', async () => {
+      try {
+        if (window.pywebview && window.pywebview.api) {
+          const native = await window.pywebview.api.get_clipboard_image();
+          if (native.error) throw new Error(native.error);
+          const response = await fetch(native.data_url);
+          const blob = await response.blob();
+          const dt = new DataTransfer();
+          dt.items.add(new File([blob], 'clipboard.png', {type: blob.type || 'image/png'}));
+          file.files = dt.files;
+          file.dispatchEvent(new Event('change'));
+          return;
+        }
+        const items = await navigator.clipboard.read();
+        const item = items.find(x => x.types.some(t => t.startsWith('image/')));
+        if (!item) throw new Error('剪贴板中没有图片');
+        const type = item.types.find(t => t.startsWith('image/'));
+        const blob = await item.getType(type);
+        const dt = new DataTransfer();
+        dt.items.add(new File([blob], 'clipboard.png', {type: blob.type || 'image/png'}));
+        file.files = dt.files;
+        file.dispatchEvent(new Event('change'));
+      } catch (e) {
+        alert('无法读取剪贴板图片，请先复制截图，并允许浏览器访问剪贴板。\n' + e.message);
+      }
+    });
     const download = document.querySelector('#download');
     const message = document.querySelector('#message'), result = document.querySelector('#result');
     const solutionToggle = document.querySelector('#showSolution');
