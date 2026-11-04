@@ -6,6 +6,7 @@ import tempfile
 import time
 
 from result_cache import ResultCache, CACHE_VERSION
+from visual_puzzle_cache import VisualPuzzleCache
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
@@ -29,6 +30,9 @@ CLUE_STRIP_CACHE = ResultCache(path=CLUE_CACHE.path.with_name("clue-strips.sqlit
                               max_entries=512, version=CACHE_VERSION + ":strips")
 SOLUTION_CACHE = ResultCache(path=RESULT_CACHE.path.with_name("solutions.sqlite3"),
                              version=CACHE_VERSION + ":solutions")
+VISUAL_CACHE = VisualPuzzleCache(ResultCache(path=RESULT_CACHE.path.with_name("visual-puzzles.sqlite3"),
+                                           max_entries=4, version=CACHE_VERSION + ":visual"))
+
 # In a PyInstaller bundle resources are unpacked under ``sys._MEIPASS``.
 # Keep source-tree execution working while allowing web_index.html to be
 # included as a bundled data file.
@@ -158,16 +162,16 @@ def solve_data(data, solution_cache=None):
     return result
 
 
-def recognize_image(image, suffix=".png", known_clues=None):
+def recognize_image(image, suffix=".png"):
     temp_path = None
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
             f.write(image)
             temp_path = f.name
-        data = validate_and_fix(ocr_nonogram(temp_path, clue_cache=CLUE_CACHE, strip_cache=CLUE_STRIP_CACHE, known_clues=known_clues))
+        data = validate_and_fix(ocr_nonogram(temp_path, clue_cache=CLUE_CACHE, strip_cache=CLUE_STRIP_CACHE, visual_cache=VISUAL_CACHE))
         result = solve_data(data, solution_cache=SOLUTION_CACHE)
-        for field in ("clue_cache_hit", "clue_cache_hits", "clue_cache_total", "continued_puzzle"):
-            result[field] = data.get(field, False if field in ("clue_cache_hit", "continued_puzzle") else 0)
+        for field in ("clue_cache_hit", "clue_cache_hits", "clue_cache_total", "auto_puzzle_match", "puzzle_similarity"):
+            result[field] = data.get(field, False if field in ("clue_cache_hit", "auto_puzzle_match") else 0)
         return result
     finally:
         if temp_path:
@@ -213,27 +217,11 @@ class Handler(BaseHTTPRequestHandler):
         marker = b"--" + boundary
         parts = payload.split(marker)
         image = None
-        known_clues = None
-        invalid_clues = False
         filename = "upload.png"
         for part in parts:
             if b"\r\n\r\n" not in part:
                 continue
             headers, content = part.split(b"\r\n\r\n", 1)
-            if b'name="continue_clues"' in headers:
-                try:
-                    known_clues = json.loads(content[:-2] if content.endswith(b"\r\n") else content)
-                    rows, cols = known_clues["row_clues"], known_clues["col_clues"]
-                    if not (isinstance(rows, list) and isinstance(cols, list) and
-                            1 <= len(rows) <= 200 and 1 <= len(cols) <= 200):
-                        raise ValueError("Invalid puzzle dimensions")
-                    for lines, length in ((rows, len(cols)), (cols, len(rows))):
-                        if not all(isinstance(line, list) and len(line) <= length and
-                                   all(type(n) is int and 0 < n <= length for n in line) for line in lines):
-                            raise ValueError("Invalid clues")
-                except (ValueError, KeyError, TypeError):
-                    invalid_clues = True
-                continue
             if b'name="image"' not in headers:
                 continue
             if b'filename="' in headers:
@@ -243,10 +231,6 @@ class Handler(BaseHTTPRequestHandler):
             image = content[:-2] if content.endswith(b"\r\n") else content
             # Continue parsing: multipart field order is not significant.
 
-        if invalid_clues:
-            self._send(400, {"error": "上一题线索无效，请取消继续上一题并重新识别"})
-            return
-
         if not image:
             self._send(400, {"error": "没有找到图片文件"})
             return
@@ -254,9 +238,8 @@ class Handler(BaseHTTPRequestHandler):
         suffix = os.path.splitext(filename)[1].lower() or ".png"
         try:
             started = time.perf_counter()
-            cache_key = image if known_clues is None else image + b"\0" + json.dumps(known_clues, sort_keys=True).encode()
             result, cache_hit = RESULT_CACHE.get_or_compute(
-                cache_key, lambda: recognize_image(image, suffix, known_clues))
+                image, lambda: recognize_image(image, suffix))
             self._send(200, {**result, "cache_hit": cache_hit,
                              "elapsed_seconds": round(time.perf_counter() - started, 3)})
         except Exception as exc:

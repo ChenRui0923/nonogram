@@ -61,23 +61,6 @@ class PuzzleReuseTests(unittest.TestCase):
             self.assertEqual(changed['row_clues'][0], [])
             self.assertNotEqual(changed['row_clues'][0], fresh['row_clues'][0])
 
-    def test_real_scaled_screenshot_explicit_continuation(self):
-        with tempfile.TemporaryDirectory() as folder:
-            cache = ResultCache(Path(folder) / 'clues.db')
-            first = ocr.ocr_nonogram(str(ROOT / 'debug.png'), clue_cache=cache)
-            known = {k: first[k] for k in ('row_clues', 'col_clues')}
-            with patch.object(ocr, 'read_clue_area', side_effect=AssertionError('Continued clues re-read')):
-                latest = ocr.ocr_nonogram(str(ROOT / 'debug2.png'), clue_cache=cache, known_clues=known)
-            self.assertTrue(latest['continued_puzzle'])
-            self.assertEqual(latest['clue_cache_hits'], 100)
-            fresh = ocr.ocr_nonogram(str(ROOT / 'debug2.png'))
-            for key in ('row_clues', 'col_clues', 'current'):
-                self.assertEqual(latest[key], fresh[key])
-            self.assertNotEqual(latest['current'], first['current'])
-            mismatched = ocr.ocr_nonogram(str(ROOT / 'image.png'), clue_cache=cache, known_clues=known)
-            self.assertFalse(mismatched['continued_puzzle'])
-            self.assertEqual(len(mismatched['col_clues']), 25)
-
     def test_multiple_solutions_use_latest_marks(self):
         with tempfile.TemporaryDirectory() as folder:
             cache = ResultCache(Path(folder) / 'solutions.db')

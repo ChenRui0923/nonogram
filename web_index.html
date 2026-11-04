@@ -75,7 +75,6 @@
       <button id="paste" type="button">📋 从剪贴板粘贴</button>
       <button id="run" disabled>开始识别</button>
       <button id="download" disabled>下载 JSON</button>
-      <label title="只在仍做上一道题时勾选；换题请取消。支持截图缩放，线索将直接沿用上一题。"><input id="continuePuzzle" type="checkbox" disabled> 继续上一题（换题请取消）</label>
       <span id="filename" class="status">尚未选择图片</span>
     </div>
     <div id="message" class="status">请选择一张数织截图。</div>
@@ -161,14 +160,11 @@
     run.addEventListener('click', async () => {
       run.disabled = true; message.textContent = '正在识别，请稍候...'; result.hidden = true;
       const form = new FormData(); form.append('image', file.files[0]);
-      if (document.querySelector('#continuePuzzle').checked && data) {
-        form.append('continue_clues', JSON.stringify({row_clues:data.row_clues, col_clues:data.col_clues}));
-      }
       try {
         const res = await fetch('/api/recognize', {method:'POST', body:form});
         const body = await res.json(); if (!res.ok) throw new Error(body.error || '识别失败');
         data = body; hintIndex = 0; solutionToggle.checked = false; result.hidden = false; render();
-        download.disabled = false; document.querySelector('#continuePuzzle').disabled = false; message.textContent = `${body.cache_hit ? '已读取整图缓存' : body.continued_puzzle ? '已沿用上一题线索，已重新识别当前填写' : body.clue_cache_hit ? `已复用 ${body.clue_cache_hits}/${body.clue_cache_total} 条线索，已更新当前填写` : '识别完成'}${body.elapsed_seconds !== undefined ? ` · ${body.elapsed_seconds} 秒` : ''}`;
+        download.disabled = false; message.textContent = `${body.cache_hit ? '已读取整图缓存' : body.auto_puzzle_match ? `已自动对齐（线索相似度 ${(body.puzzle_similarity * 100).toFixed(2)}%），复用 ${body.clue_cache_hits}/${body.clue_cache_total} 条线索并更新填写` : body.clue_cache_hit ? `已复用 ${body.clue_cache_hits}/${body.clue_cache_total} 条线索，已更新当前填写` : '识别完成'}${body.elapsed_seconds !== undefined ? ` · ${body.elapsed_seconds} 秒` : ''}`;
       } catch (e) { message.textContent = '错误：' + e.message; }
       finally { run.disabled = false; }
     });

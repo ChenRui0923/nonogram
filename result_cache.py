@@ -9,7 +9,7 @@ import threading
 import time
 
 # Bump when recognition, solver semantics, or the cached response schema changes.
-CACHE_VERSION = 'v0.1.6'
+CACHE_VERSION = 'v0.1.7'
 
 
 def default_cache_path():
@@ -34,6 +34,19 @@ class ResultCache:
         conn = sqlite3.connect(self.path, timeout=2)
         conn.execute('CREATE TABLE IF NOT EXISTS results (key TEXT PRIMARY KEY, value TEXT NOT NULL, accessed INTEGER NOT NULL)')
         return conn
+
+    def recent_values(self):
+        with self.lock:
+            conn = None
+            try:
+                conn = self._connect()
+                return [json.loads(row[0]) for row in conn.execute(
+                    'SELECT value FROM results ORDER BY accessed DESC LIMIT ?', (self.max_entries,))]
+            except (OSError, sqlite3.Error, ValueError):
+                return []
+            finally:
+                if conn is not None:
+                    conn.close()
 
     def get_or_compute(self, image, compute):
         key = hashlib.sha256(self.version.encode() + b'\0' + image).hexdigest()
