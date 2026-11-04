@@ -1,5 +1,7 @@
 # Nonogram 助手
 
+<img src="assets/icons/nonogram.png" alt="Nonogram 应用图标" width="128">
+
 本地运行的数织（Nonogram）截图识别与求解工具：识别行列数字和当前棋盘、生成完整解答、检查填写冲突，并给出下一步提示。图片由本机处理，不需要上传到在线 OCR 服务。
 
 支持 Windows / macOS 桌面窗口，也可以直接运行 Python Web 版或命令行版。

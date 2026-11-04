@@ -12,5 +12,5 @@ exe = EXE(pyz, a.scripts, [], [], [], name="Nonogram",
           debug=False, bootloader_ignore_signals=False, strip=False, upx=False,
           console=False, exclude_binaries=True)
 coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="Nonogram")
-app = BUNDLE(coll, name="Nonogram.app", icon=None,
+app = BUNDLE(coll, name="Nonogram.app", icon="assets/icons/nonogram.icns",
              info_plist={"CFBundleName": "Nonogram", "CFBundleDisplayName": "Nonogram"})
