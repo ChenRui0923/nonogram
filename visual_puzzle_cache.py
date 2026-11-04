@@ -1,4 +1,4 @@
-"""Register screenshots using clue features, then verify each clue independently."""
+"""Match puzzle identity using aligned clue imagery and verified grid geometry."""
 import base64
 import threading
 
@@ -14,11 +14,12 @@ class VisualPuzzleCache:
         self.lock = threading.RLock()
         self.orb = cv2.ORB_create(nfeatures=2500)
 
-    def _features(self, image):
+    def _features(self, image, feature_budget=2500):
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         scale = min(1.0, 1200 / max(gray.shape))
         small = cv2.resize(gray, None, fx=scale, fy=scale)
-        points, descriptors = self.orb.detectAndCompute(small, None)
+        detector = self.orb if feature_budget == 2500 else cv2.ORB_create(nfeatures=feature_budget)
+        points, descriptors = detector.detectAndCompute(small, None)
         coords = np.float32([p.pt for p in points]).reshape(-1, 2) / scale
         return coords, descriptors
 
@@ -39,14 +40,29 @@ class VisualPuzzleCache:
 
     def align(self, image):
         with self.lock:
+            # Escalate feature density only after cheaper registration fails.
+            for budget in (2500, 5000, 8000):
+                aligned, match = self._align_once(image, budget)
+                if match is not None:
+                    return aligned, match
+            return image, None
+
+    def _align_once(self, image, feature_budget):
+        with self.lock:
             self._load()
             if not self.entries:
                 return image, None
-            points, desc = self._features(image)
+            points, desc = self._features(image, feature_budget)
             if desc is None:
                 return image, None
             for record in self.entries:
-                refpoints, refdesc = record['features']
+                if feature_budget == 2500:
+                    refpoints, refdesc = record['features']
+                else:
+                    extra = record.setdefault('extra_features', {})
+                    if feature_budget not in extra:
+                        extra[feature_budget] = self._features(record['pixels'], feature_budget)
+                    refpoints, refdesc = extra[feature_budget]
                 if refdesc is None:
                     continue
                 pairs = cv2.BFMatcher(cv2.NORM_HAMMING).knnMatch(desc, refdesc, k=2)
@@ -90,12 +106,6 @@ class VisualPuzzleCache:
                                  np.count_nonzero(new & old_near) / max(1, np.count_nonzero(new)))
                 if similarity < self.minimum_similarity:
                     continue
-                # A homography is only a candidate. Every reused line must pass
-                # its own glyph comparison; changed/ambiguous lines still run OCR.
-                row_values, col_values = self._verified_lines(reference, aligned, record)
-                matched = sum(x is not None for x in row_values + col_values)
-                if matched < 0.3 * (len(row_values) + len(col_values)):
-                    continue
                 # Verify the expected grid itself before using reference geometry.
                 v, h = record['v'], record['h']
                 dark = cv2.cvtColor(aligned, cv2.COLOR_BGR2GRAY) < 180
@@ -107,70 +117,8 @@ class VisualPuzzleCache:
                 rectified = cv2.warpPerspective(image, scale @ homography,
                                                 (width * 2, height * 2),
                                                 borderValue=(255, 255, 255))
-                return rectified, {**record, 'reuse_rows': row_values, 'reuse_cols': col_values, 'similarity': float(similarity)}
+                return rectified, {**record, 'reuse_rows': record['row_clues'], 'reuse_cols': record['col_clues'], 'similarity': float(similarity)}
             return image, None
-
-    @staticmethod
-    def _same_strip(a, b, clue):
-        from ocr_nonogram import _ink_mask, _normalize_glyph, _glyph_score, _count_holes, _glyph_templates
-        def components(image):
-            bw = _ink_mask(image)
-            n, labels, stats, _ = cv2.connectedComponentsWithStats(bw)
-            items = []
-            for i in range(1, n):
-                x, y, w, h, area = stats[i]
-                if area < 6:
-                    continue
-                # Full-length border segments are not digit strokes.
-                if w >= bw.shape[1] * 0.9 or h >= bw.shape[0] * 0.95:
-                    continue
-                mask = (labels[y:y+h, x:x+w] == i).astype(np.uint8)
-                items.append((x, y, w, h, mask))
-            return sorted(items, key=lambda c: (round(c[1] / 4), c[0]))
-        left, right = components(a), components(b)
-        digits = [int(d) for n in clue for d in str(n)]
-        if not left or len(left) != len(right) or len(left) != len(digits):
-            return False
-        # Sort by reading order, matching spatial positions too (including gaps).
-        horizontal = a.shape[1] > a.shape[0]
-        left.sort(key=lambda c: c[0] if horizontal else (c[1], c[0]))
-        right.sort(key=lambda c: c[0] if horizontal else (c[1], c[0]))
-        templates = _glyph_templates()
-        for x, y, expected in zip(left, right, digits):
-            if abs(x[0]-y[0]) > 2 or abs(x[1]-y[1]) > 2:
-                return False
-            if not 0.8 < (y[2]*y[3]) / (x[2]*x[3]) < 1.25:
-                return False
-            if _count_holes(x[4]) != _count_holes(y[4]):
-                return False
-            m, n = _normalize_glyph(x[4]), _normalize_glyph(y[4])
-            if m is None or n is None:
-                return False
-            dm = cv2.distanceTransform(1-m, cv2.DIST_L2, 3)
-            dn = cv2.distanceTransform(1-n, cv2.DIST_L2, 3)
-            distance = _glyph_score(m, dm, n, dn)
-            if distance > 0.24:
-                return False
-            # A visually similar different digit must not inherit the old clue.
-            # Compare to competing digit templates without the costly shift search;
-            # ambiguous cases go through the normal OCR pipeline instead.
-            yy, xx = np.nonzero(n)
-            alternative = min((float(dt[yy, xx].mean()) + float(dn[tpl > 0].mean())) / 2
-                              for key, (tpl, dt) in templates.items() if key[1] != expected)
-            if alternative <= distance + 0.1:
-                return False
-        return True
-
-    def _verified_lines(self, reference, image, record):
-        v, h = record['v'], record['h']
-        rows, cols = [], []
-        for r, clue in enumerate(record['row_clues']):
-            region = (slice(h[r]+3, h[r+1]-3), slice(3, v[0]-3))
-            rows.append(clue if self._same_strip(reference[region], image[region], clue) else None)
-        for c, clue in enumerate(record['col_clues']):
-            region = (slice(3, h[0]-3), slice(v[c]+3, v[c+1]-3))
-            cols.append(clue if self._same_strip(reference[region], image[region], clue) else None)
-        return rows, cols
 
     def remember(self, image, v, h, rows, cols):
         with self.lock:

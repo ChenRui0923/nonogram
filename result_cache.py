@@ -9,7 +9,7 @@ import threading
 import time
 
 # Bump when recognition, solver semantics, or the cached response schema changes.
-CACHE_VERSION = 'v0.1.7'
+CACHE_VERSION = 'puzzle-identity-v2'
 
 
 def default_cache_path():

@@ -943,7 +943,7 @@ def _numbers_in_cell(cell_img, axis, templates, max_value=None):
     return numbers
 
 
-def _read_clues_by_glyphs(clue_img, axis, board_grid_lines, strip_cache=None, cache_stats=None, visual_clues=None):
+def _read_clues_by_glyphs(clue_img, axis, board_grid_lines, strip_cache=None, cache_stats=None):
     templates = _glyph_templates()
     if not templates:
         return []
@@ -956,12 +956,6 @@ def _read_clues_by_glyphs(clue_img, axis, board_grid_lines, strip_cache=None, ca
     max_value = n_cells
     clues = []
     for i in range(n_cells):
-        if visual_clues is not None and visual_clues[i] is not None:
-            clues.append(visual_clues[i][:])
-            if cache_stats is not None:
-                cache_stats["total"] += 1
-                cache_stats["hits"] += 1
-            continue
         a = max(0, board_grid_lines[i] - offset + 1)
         b = min((h if axis == 1 else w) - 1, board_grid_lines[i + 1] - offset - 1)
         if b - a < 4:
@@ -982,7 +976,7 @@ def _read_clues_by_glyphs(clue_img, axis, board_grid_lines, strip_cache=None, ca
     return clues
 
 
-def read_clue_area(clue_img, axis, board_grid_lines=None, strip_cache=None, cache_stats=None, visual_clues=None):
+def read_clue_area(clue_img, axis, board_grid_lines=None, strip_cache=None, cache_stats=None):
     """读取提示区数字。
 
     优先走"字形切割 + 模板匹配"的新实现（能处理粘连数字、不同字体），
@@ -993,7 +987,7 @@ def read_clue_area(clue_img, axis, board_grid_lines=None, strip_cache=None, cach
 
     if board_grid_lines is not None and len(board_grid_lines) >= 2:
         try:
-            nums = _read_clues_by_glyphs(clue_img, axis, board_grid_lines, strip_cache, cache_stats, visual_clues)
+            nums = _read_clues_by_glyphs(clue_img, axis, board_grid_lines, strip_cache, cache_stats)
             if any(nums):
                 return nums
         except Exception:
@@ -1261,14 +1255,18 @@ def ocr_nonogram(img_path, debug_dir=None, clue_cache=None, strip_cache=None, vi
     cache_allowed = visual_cache is None or visual_match is not None
     cache_stats = {"hits": 0, "total": 0}
     def read_clues():
-        rows = read_clue_area(row_clue_img, axis=1, board_grid_lines=board_h_grid, strip_cache=strip_cache if cache_allowed else None, cache_stats=cache_stats, visual_clues=visual_match["reuse_rows"] if visual_match else None)
-        cols = read_clue_area(col_clue_img, axis=0, board_grid_lines=board_v_grid, strip_cache=strip_cache if cache_allowed else None, cache_stats=cache_stats, visual_clues=visual_match["reuse_cols"] if visual_match else None)
+        rows = read_clue_area(row_clue_img, axis=1, board_grid_lines=board_h_grid, strip_cache=strip_cache if cache_allowed else None, cache_stats=cache_stats)
+        cols = read_clue_area(col_clue_img, axis=0, board_grid_lines=board_v_grid, strip_cache=strip_cache if cache_allowed else None, cache_stats=cache_stats)
         rows = (rows + [[] for _ in range(nrows)])[:nrows]
         cols = (cols + [[] for _ in range(ncols)])[:ncols]
         return {"row_clues": rows, "col_clues": cols}
 
     clue_cache_hit = False
-    if clue_cache is not None and not debug_dir and cache_allowed:
+    if visual_match is not None:
+        clues = {"row_clues": [line[:] for line in visual_match['row_clues']],
+                 "col_clues": [line[:] for line in visual_match['col_clues']]}
+        clue_cache_hit = True
+    elif clue_cache is not None and not debug_dir and cache_allowed:
         # Match the complete clue silhouettes, not a fuzzy image similarity.
         # Ignore text color (games recolor completed clues); retain every ink pixel.
         geometry = np.asarray([*img.shape, *board_h_grid, *board_v_grid], dtype=np.int64).tobytes()

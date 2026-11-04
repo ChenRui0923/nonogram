@@ -1,0 +1,410 @@
+[
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "original",
+    "reused": true,
+    "similarity": 0.9999472142310433,
+    "clue_hits": 100,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.249
+  },
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "scale-0.5",
+    "reused": true,
+    "similarity": 0.998763863375827,
+    "clue_hits": 100,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.5534
+  },
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "scale-0.75",
+    "reused": true,
+    "similarity": 0.999681097646345,
+    "clue_hits": 100,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.1841
+  },
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "scale-1.25",
+    "reused": true,
+    "similarity": 0.9957414136364042,
+    "clue_hits": 100,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.2587
+  },
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "scale-1.5",
+    "reused": true,
+    "similarity": 0.996214589899026,
+    "clue_hits": 100,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.2979
+  },
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "anisotropic-0.85x1.1",
+    "reused": false,
+    "similarity": null,
+    "clue_hits": 0,
+    "clues_correct": false,
+    "cell_differences": 0,
+    "seconds": 2.267
+  },
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "white-padding",
+    "reused": true,
+    "similarity": 0.9958931871546036,
+    "clue_hits": 100,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.3167
+  },
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "trim-2px",
+    "reused": true,
+    "similarity": 0.9999649764904692,
+    "clue_hits": 100,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.2065
+  },
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "cut-off-clues",
+    "reused": false,
+    "similarity": null,
+    "clue_hits": 0,
+    "clues_correct": false,
+    "cell_differences": 0,
+    "seconds": 2.5173
+  },
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "jpeg-95",
+    "reused": true,
+    "similarity": 0.9999285771679062,
+    "clue_hits": 100,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.2375
+  },
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "jpeg-80",
+    "reused": true,
+    "similarity": 0.9999569333069191,
+    "clue_hits": 100,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.2413
+  },
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "blur-0.45",
+    "reused": true,
+    "similarity": 0.9997395220650018,
+    "clue_hits": 100,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.2352
+  },
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "blur-0.8",
+    "reused": true,
+    "similarity": 0.9991346030838231,
+    "clue_hits": 100,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.2175
+  },
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "blur-1.2",
+    "reused": false,
+    "similarity": null,
+    "clue_hits": 0,
+    "clues_correct": false,
+    "cell_differences": "dimension-mismatch",
+    "seconds": 1.8689
+  },
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "brightness",
+    "reused": true,
+    "similarity": 0.9983840584238767,
+    "clue_hits": 100,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.2138
+  },
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "rotation-0.5",
+    "reused": true,
+    "similarity": 0.9993248706001984,
+    "clue_hits": 100,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.4064
+  },
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "rotation-2",
+    "reused": true,
+    "similarity": 0.9990877210602522,
+    "clue_hits": 100,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.3986
+  },
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "perspective-20",
+    "reused": true,
+    "similarity": 0.9999553607299413,
+    "clue_hits": 100,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.5602
+  },
+  {
+    "pair": "debug.png -> debug2.png",
+    "case": "perspective-60",
+    "reused": true,
+    "similarity": 0.9999916850980327,
+    "clue_hits": 100,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.308
+  },
+  {
+    "pair": "debug.png -> other",
+    "case": "image.png",
+    "negative": true,
+    "reused": false,
+    "seconds": 0.3502
+  },
+  {
+    "pair": "debug.png -> other",
+    "case": "微信图片_2026-10-08_155212_686.jpg",
+    "negative": true,
+    "reused": false,
+    "seconds": 0.0896
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "original",
+    "reused": true,
+    "similarity": 1.0,
+    "clue_hits": 55,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.1248
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "scale-0.5",
+    "reused": false,
+    "similarity": null,
+    "clue_hits": 0,
+    "clues_correct": false,
+    "cell_differences": 0,
+    "seconds": 0.7339
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "scale-0.75",
+    "reused": true,
+    "similarity": 0.9972813458499861,
+    "clue_hits": 55,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.1777
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "scale-1.25",
+    "reused": true,
+    "similarity": 1.0,
+    "clue_hits": 55,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.1506
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "scale-1.5",
+    "reused": true,
+    "similarity": 1.0,
+    "clue_hits": 55,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.1802
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "anisotropic-0.85x1.1",
+    "reused": false,
+    "similarity": null,
+    "clue_hits": 0,
+    "clues_correct": false,
+    "cell_differences": 0,
+    "seconds": 0.7517
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "white-padding",
+    "reused": false,
+    "similarity": null,
+    "clue_hits": 0,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.7158
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "trim-2px",
+    "reused": true,
+    "similarity": 0.9981311951512091,
+    "clue_hits": 55,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.2244
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "cut-off-clues",
+    "reused": false,
+    "similarity": null,
+    "clue_hits": 0,
+    "clues_correct": false,
+    "cell_differences": 0,
+    "seconds": 0.6249
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "jpeg-95",
+    "reused": true,
+    "similarity": 1.0,
+    "clue_hits": 55,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.1457
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "jpeg-80",
+    "reused": true,
+    "similarity": 1.0,
+    "clue_hits": 55,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.146
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "blur-0.45",
+    "reused": true,
+    "similarity": 1.0,
+    "clue_hits": 55,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.1379
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "blur-0.8",
+    "reused": true,
+    "similarity": 1.0,
+    "clue_hits": 55,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.1286
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "blur-1.2",
+    "reused": true,
+    "similarity": 0.999918418127492,
+    "clue_hits": 55,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.1263
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "brightness",
+    "reused": true,
+    "similarity": 1.0,
+    "clue_hits": 55,
+    "clues_correct": true,
+    "cell_differences": 0,
+    "seconds": 0.1214
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "rotation-0.5",
+    "reused": false,
+    "similarity": null,
+    "clue_hits": 0,
+    "clues_correct": false,
+    "cell_differences": "dimension-mismatch",
+    "seconds": 1.3513
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "rotation-2",
+    "reused": false,
+    "similarity": null,
+    "clue_hits": 0,
+    "clues_correct": false,
+    "cell_differences": "dimension-mismatch",
+    "seconds": 7.7529
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "perspective-20",
+    "reused": false,
+    "similarity": null,
+    "clue_hits": 0,
+    "clues_correct": false,
+    "cell_differences": "dimension-mismatch",
+    "seconds": 1.8462
+  },
+  {
+    "pair": "image.png -> image copy.png",
+    "case": "perspective-60",
+    "reused": false,
+    "similarity": null,
+    "clue_hits": 0,
+    "clues_correct": false,
+    "cell_differences": "dimension-mismatch",
+    "seconds": 8.2624
+  },
+  {
+    "pair": "image.png -> other",
+    "case": "debug.png",
+    "negative": true,
+    "reused": false,
+    "seconds": 0.3926
+  },
+  {
+    "pair": "image.png -> other",
+    "case": "微信图片_2026-10-08_155212_686.jpg",
+    "negative": true,
+    "reused": false,
+    "seconds": 0.0886
+  }
+]
