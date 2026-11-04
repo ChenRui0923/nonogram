@@ -25,6 +25,7 @@ exe = EXE(
     a.datas,
     [],
     name="Nonogram",
+    icon="assets/icons/nonogram.ico",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -1,6 +1,6 @@
 # 应用图标备选
 
-这些图片是设计方向草图，尚未替换应用图标。定稿时需要重新校准网格、数字线索和像素图案，确保符合数织规则，再导出 Windows ICO 和 macOS ICNS。
+C 款修正版已选定为应用图标，并已导出 Windows ICO 和 macOS ICNS、接入打包配置。其余图片保留作设计过程参考。
 
 ## 数织主题（最新一组）
 
@@ -33,4 +33,4 @@
 
 ![C 款：数字与格子一致的修正版](nonogram-c-corrected.png)
 
-[打开修正版原图](nonogram-c-corrected.png)。旧对比图保留用于回顾，数字错误以本修正版为准。此文件仍为设计稿，尚未替换应用图标。
+[打开修正版原图](nonogram-c-corrected.png)。旧对比图保留用于回顾，数字错误以本修正版为准。此修正版已用于应用图标。图标文件见 [`assets/icons`](../../assets/icons/)，可执行 `python packaging/build_icons.py` 重新生成。
