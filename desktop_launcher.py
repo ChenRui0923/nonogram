@@ -9,10 +9,6 @@ import webbrowser
 import urllib.request
 import base64
 import io
-try:
-    import webview
-except ImportError:
-    webview = None
 
 
 class ClipboardApi:
@@ -38,12 +34,6 @@ class ClipboardApi:
         except Exception as exc:
             return {"error": str(exc)}
         return {"error": "剪贴板中没有图片"}
-try:
-    import tkinter as tk
-    from tkinter import messagebox
-except ImportError:
-    tk = None
-    messagebox = None
 
 from web_app import HOST, PORT, ThreadingHTTPServer, Handler
 
@@ -67,18 +57,34 @@ def main():
             webbrowser.open(url)
 
     if args.smoke_test:
+        print("HTTP server started; checking bundled HTML", flush=True)
         try:
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
             with opener.open(url, timeout=10) as response:
                 assert b"Nonogram OCR" in response.read(), "Missing bundled HTML"
+            print("Checking OCR font templates", flush=True)
             from ocr_nonogram import _glyph_templates
             assert any(key[0] == "DejaVuSans-Bold.ttf" for key in _glyph_templates()), "Missing bundled font"
+            print("Checking solver", flush=True)
             from solver import Solver
             assert Solver([[1]], [[1]]).solve() == [["O"]], "Solver failed"
         finally:
             server.shutdown()
             server.server_close()
+        print("Smoke test passed", flush=True)
         return
+
+    # The smoke check does not need native GUI/CLR initialization.
+    try:
+        import webview
+    except ImportError:
+        webview = None
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+    except ImportError:
+        tk = None
+        messagebox = None
 
     if webview is not None:
         webview.create_window("Nonogram OCR", url, width=1200, height=850,
@@ -131,4 +137,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        import sys
+        import traceback
+        traceback.print_exc()
+        if "--smoke-test" in sys.argv:
+            # Avoid a frozen windowless error dialog blocking CI indefinitely.
+            raise SystemExit(1)
+        raise

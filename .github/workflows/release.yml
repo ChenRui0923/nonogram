@@ -12,8 +12,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - run: python -m pip install opencv-python numpy pillow pytesseract
@@ -33,8 +33,8 @@ jobs:
             platform: macos-arm64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: pip
@@ -49,9 +49,22 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $env:NONOGRAM_STARTUP_LOG = Join-Path $env:RUNNER_TEMP 'nonogram-smoke.log'
           $process = Start-Process -FilePath dist/Nonogram.exe -ArgumentList '--smoke-test', '--port', '0' -PassThru
-          if (-not $process.WaitForExit(60000)) { $process.Kill(); throw 'Bundle smoke test timed out' }
-          if ($process.ExitCode -ne 0) { throw "Bundle smoke test failed: $($process.ExitCode)" }
+          try {
+            if (-not $process.WaitForExit(180000)) { $process.Kill(); throw 'Bundle smoke test timed out after 180s' }
+            if ($process.ExitCode -ne 0) { throw "Bundle smoke test failed: $($process.ExitCode)" }
+          } finally {
+            if (Test-Path $env:NONOGRAM_STARTUP_LOG) { Get-Content $env:NONOGRAM_STARTUP_LOG }
+            else { Write-Warning 'No Python startup log: process did not reach the runtime hook' }
+          }
+      - name: Save Windows startup diagnostics
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v5
+        with:
+          name: windows-startup-diagnostics
+          path: ${{ runner.temp }}/nonogram-smoke.log
+          if-no-files-found: warn
       - name: Build and test macOS application
         if: runner.os == 'macOS'
         run: |
@@ -70,7 +83,7 @@ jobs:
             cp dist/Nonogram-macOS.dmg "release/Nonogram-${PLATFORM}.dmg"
           fi
           cp build-dependencies.txt "release/dependencies-${PLATFORM}.txt"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: Nonogram-${{ matrix.platform }}
           path: release/*
@@ -84,9 +97,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
         with:
           path: release
+          pattern: Nonogram-*
           merge-multiple: true
       - name: Publish release with checksums
         env:
