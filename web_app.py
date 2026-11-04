@@ -3,6 +3,9 @@ import json
 import os
 import sys
 import tempfile
+import time
+
+from result_cache import ResultCache
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
@@ -19,6 +22,7 @@ from solver import Solver, UNKNOWN
 
 HOST = "127.0.0.1"
 PORT = 8765
+RESULT_CACHE = ResultCache()
 # In a PyInstaller bundle resources are unpacked under ``sys._MEIPASS``.
 # Keep source-tree execution working while allowing web_index.html to be
 # included as a bundled data file.
@@ -131,6 +135,19 @@ def solve_data(data):
     }
 
 
+def recognize_image(image, suffix=".png"):
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
+            f.write(image)
+            temp_path = f.name
+        data = validate_and_fix(ocr_nonogram(temp_path))
+        return solve_data(data)
+    finally:
+        if temp_path:
+            os.unlink(temp_path)
+
+
 class Handler(BaseHTTPRequestHandler):
     def _send(self, status, body, content_type="application/json; charset=utf-8"):
         if isinstance(body, bytes):
@@ -181,7 +198,7 @@ class Handler(BaseHTTPRequestHandler):
                 filename = headers.split(b'filename="', 1)[1].split(b'"', 1)[0].decode(
                     "utf-8", "ignore"
                 )
-            image = content.rstrip(b"\r\n-")
+            image = content[:-2] if content.endswith(b"\r\n") else content
             break
 
         if not image:
@@ -189,22 +206,14 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         suffix = os.path.splitext(filename)[1].lower() or ".png"
-        temp_path = None
         try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
-                f.write(image)
-                temp_path = f.name
-            data = validate_and_fix(ocr_nonogram(temp_path))
-            result = solve_data(data)
-            self._send(200, json.dumps(result, ensure_ascii=False))
+            started = time.perf_counter()
+            result, cache_hit = RESULT_CACHE.get_or_compute(
+                image, lambda: recognize_image(image, suffix))
+            self._send(200, {**result, "cache_hit": cache_hit,
+                             "elapsed_seconds": round(time.perf_counter() - started, 3)})
         except Exception as exc:
             self._send(500, {"error": str(exc)})
-        finally:
-            if temp_path:
-                try:
-                    os.unlink(temp_path)
-                except OSError:
-                    pass
 
     def log_message(self, fmt, *args):
         print("%s - %s" % (self.address_string(), fmt % args))

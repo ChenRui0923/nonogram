@@ -23,6 +23,7 @@
     .panel { min-width:0; background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px; }
     .panel h2 { font-size:16px; margin:0 0 14px; }
     .notice { padding:10px 12px; background:#fff7e6; border-left:4px solid #e49a16; margin-bottom:14px; }
+    .success { background:#ecf8f0; border-left-color:#22834a; color:#185d35; }
     .error { background:#ffebee; border-left-color:var(--bad); }
     .stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px; }
     .stat { border:1px solid var(--line); padding:10px; border-radius:6px; }
@@ -45,15 +46,15 @@
     .board-wrap { overflow:auto; padding:0; width:100%; }
     .board-stage { position:relative; }
     .puzzle-grid { transform-origin:top left; }
-    .row-clue span { display:inline-block; min-width:18px; text-align:center; }
+    .row-clue span { display:inline-block; min-width:21px; text-align:center; }
     .row-clue { gap:3px; font-variant-numeric:tabular-nums; }
     .top-clue, .row-clue { font-variant-numeric:tabular-nums; }
     .puzzle-grid { display:grid; width:max-content; background:#fff; border-top:var(--thick) solid #26323b; border-left:var(--thick) solid #26323b; }
     .puzzle-grid > div { min-width:0; min-height:0; border-right:var(--thin) solid var(--line); border-bottom:var(--thin) solid var(--line); }
     .corner { background:#f7f9fa; }
-    .top-clue { height:var(--clue-height); padding:2px 1px 2px; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; color:#26323b; font:12px/14px ui-monospace,SFMono-Regular,Menlo,monospace; }
-    .top-clue span { display:block; flex:none; height:14px; line-height:14px; min-height:14px; }
-    .row-clue { width:var(--clue-width); height:var(--cell); padding:0 6px 0 3px; display:flex; align-items:center; justify-content:flex-end; color:#26323b; background:#f7f9fa; font:12px ui-monospace,SFMono-Regular,Menlo,monospace; white-space:nowrap; }
+    .top-clue { height:var(--clue-height); padding:2px 1px 2px; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; color:#26323b; font:700 14px/18px ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .top-clue span { display:block; flex:none; height:18px; line-height:18px; min-height:18px; }
+    .row-clue { width:var(--clue-width); height:var(--cell); padding:0 6px 0 3px; display:flex; align-items:center; justify-content:flex-end; color:#26323b; background:#f7f9fa; font:700 14px ui-monospace,SFMono-Regular,Menlo,monospace; white-space:nowrap; }
     .cell { width:var(--cell); height:var(--cell); display:flex; align-items:center; justify-content:center; background:#fff; font-weight:700; font-size:12px; }
     .cell.filled { background:#17212b; color:#fff; }
     .cell.empty { color:#d32f2f; background:#fff; font-size:14px; }
@@ -163,7 +164,7 @@
         const res = await fetch('/api/recognize', {method:'POST', body:form});
         const body = await res.json(); if (!res.ok) throw new Error(body.error || '识别失败');
         data = body; hintIndex = 0; solutionToggle.checked = false; result.hidden = false; render();
-        download.disabled = false; message.textContent = '识别完成';
+        download.disabled = false; message.textContent = `${body.cache_hit ? '已读取本地缓存' : '识别完成'}${body.elapsed_seconds !== undefined ? ` · ${body.elapsed_seconds} 秒` : ''}`;
       } catch (e) { message.textContent = '错误：' + e.message; }
       finally { run.disabled = false; }
     });
@@ -193,6 +194,10 @@
       const notes = [];
       if (!data.solvable) notes.push('<div class="notice error">题目无解：请核对 OCR 识别出的行列提示。</div>');
       if (data.issues.length) notes.push(`<div class="notice error">${data.issues.map(x=>x.message).join('<br>')}</div>`);
+      if (data.solvable && !data.issues.length && !data.errors.length) {
+        const percent = data.total ? Math.floor(data.filled * 100 / data.total) : 0;
+        notes.push(`<div class="notice success">恭喜你，当前没有错误！已完成 ${percent}%（${data.filled}/${data.total} 格）。${percent === 100 ? '全部完成！' : '继续加油！'}</div>`);
+      }
       document.querySelector('#notices').innerHTML = notes.join('');
       renderHint();
       renderBoard();
@@ -220,8 +225,8 @@
       const wrong = new Set((data.errors || []).map(x => `${x.row-1},${x.col-1}`));
       const selectedHint = data?.hints?.[hintIndex];
       const maxColClue = Math.max(...cols.map(c => c.length), 1);
-      const clueWidth = Math.max(112, ...rows.map(clue => clue.length * 21 + 12));
-      const clueHeight = maxColClue * 14 + 10;
+      const clueWidth = Math.max(112, ...rows.map(clue => clue.length * 24 + 12));
+      const clueHeight = maxColClue * 18 + 12;
       let html = `<div class="board-wrap"><div class="board-stage"><div class="puzzle-grid" style="--cell:22px;--clue-width:${clueWidth}px;--clue-height:${clueHeight}px;grid-template-columns:var(--clue-width) repeat(${cols.length},var(--cell));grid-template-rows:${clueHeight}px repeat(${rows.length},var(--cell))">`;
       html += '<div class="corner"></div>';
       html += cols.map((clue, c) => {

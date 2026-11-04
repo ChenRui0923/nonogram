@@ -624,14 +624,18 @@ def _glyph_score(a, dt_a, b, dt_b):
     """带平移容差的对称距离，越小越像。"""
     ys_a, xs_a = np.nonzero(a)
     ys_b, xs_b = np.nonzero(b)
-    best = 1e9
-    for dy, dx in _GLYPH_SHIFTS:
-        d1 = np.roll(np.roll(dt_b, -dy, 0), -dx, 1)[ys_a, xs_a].mean()
-        d2 = np.roll(np.roll(dt_a, dy, 0), dx, 1)[ys_b, xs_b].mean()
-        s = (float(d1) + float(d2)) / 2
-        if s < best:
-            best = s
-    return best
+    # Sample every shift directly instead of rolling entire distance maps.
+    # Modulo indexing preserves the previous wraparound semantics exactly.
+    shifts = np.asarray(_GLYPH_SHIFTS, dtype=np.intp)
+    dy, dx = shifts[:, 0, None], shifts[:, 1, None]
+    height, width = a.shape
+    d1 = dt_b[(ys_a[None, :] + dy) % height,
+              (xs_a[None, :] + dx) % width].mean(axis=1)
+    d2 = dt_a[(ys_b[None, :] - dy) % height,
+              (xs_b[None, :] - dx) % width].mean(axis=1)
+    scores = (d1.astype(np.float64) + d2.astype(np.float64)) / 2
+    return float(scores.min())
+
 
 
 def _count_holes(mask):
