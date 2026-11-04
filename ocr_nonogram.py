@@ -943,7 +943,7 @@ def _numbers_in_cell(cell_img, axis, templates, max_value=None):
     return numbers
 
 
-def _read_clues_by_glyphs(clue_img, axis, board_grid_lines):
+def _read_clues_by_glyphs(clue_img, axis, board_grid_lines, strip_cache=None, cache_stats=None):
     templates = _glyph_templates()
     if not templates:
         return []
@@ -962,11 +962,21 @@ def _read_clues_by_glyphs(clue_img, axis, board_grid_lines):
             clues.append([])
             continue
         cell = clue_img[a:b, :] if axis == 1 else clue_img[:, a:b]
-        clues.append(_numbers_in_cell(cell, "x" if axis == 1 else "y", templates, max_value=max_value))
+        def recognize_strip():
+            return _numbers_in_cell(cell, "x" if axis == 1 else "y", templates, max_value=max_value)
+        if strip_cache is not None:
+            signature = np.asarray([axis, max_value, *cell.shape], dtype=np.int64).tobytes() + _ink_mask(cell).tobytes()
+            values, hit = strip_cache.get_or_compute(signature, recognize_strip)
+            if cache_stats is not None:
+                cache_stats["total"] += 1
+                cache_stats["hits"] += int(hit)
+        else:
+            values = recognize_strip()
+        clues.append(values)
     return clues
 
 
-def read_clue_area(clue_img, axis, board_grid_lines=None):
+def read_clue_area(clue_img, axis, board_grid_lines=None, strip_cache=None, cache_stats=None):
     """读取提示区数字。
 
     优先走"字形切割 + 模板匹配"的新实现（能处理粘连数字、不同字体），
@@ -977,7 +987,7 @@ def read_clue_area(clue_img, axis, board_grid_lines=None):
 
     if board_grid_lines is not None and len(board_grid_lines) >= 2:
         try:
-            nums = _read_clues_by_glyphs(clue_img, axis, board_grid_lines)
+            nums = _read_clues_by_glyphs(clue_img, axis, board_grid_lines, strip_cache, cache_stats)
             if any(nums):
                 return nums
         except Exception:
@@ -1194,7 +1204,7 @@ def read_board_cells(img, v_lines, h_lines, vs, ve, hs, he):
     return current
 
 
-def ocr_nonogram(img_path, debug_dir=None):
+def ocr_nonogram(img_path, debug_dir=None, clue_cache=None, strip_cache=None, known_clues=None):
     img = cv2.imread(img_path)
     if img is None:
         raise FileNotFoundError(f"Cannot read image: {img_path}")
@@ -1227,15 +1237,32 @@ def ocr_nonogram(img_path, debug_dir=None):
     board_h_grid = h_lines[hs:he + 1]
     board_v_grid = v_lines[vs:ve + 1]
 
-    row_clues = read_clue_area(row_clue_img, axis=1, board_grid_lines=board_h_grid)
-    col_clues = read_clue_area(col_clue_img, axis=0, board_grid_lines=board_v_grid)
+    cache_stats = {"hits": 0, "total": 0}
+    def read_clues():
+        rows = read_clue_area(row_clue_img, axis=1, board_grid_lines=board_h_grid, strip_cache=strip_cache, cache_stats=cache_stats)
+        cols = read_clue_area(col_clue_img, axis=0, board_grid_lines=board_v_grid, strip_cache=strip_cache, cache_stats=cache_stats)
+        rows = (rows + [[] for _ in range(nrows)])[:nrows]
+        cols = (cols + [[] for _ in range(ncols)])[:ncols]
+        return {"row_clues": rows, "col_clues": cols}
 
-    while len(row_clues) < nrows:
-        row_clues.append([])
-    while len(col_clues) < ncols:
-        col_clues.append([])
-    row_clues = row_clues[:nrows]
-    col_clues = col_clues[:ncols]
+    clue_cache_hit = False
+    continued_puzzle = bool(known_clues and len(known_clues["row_clues"]) == nrows
+                            and len(known_clues["col_clues"]) == ncols)
+    if continued_puzzle:
+        # Explicit user confirmation, not a fuzzy guess that equally sized boards match.
+        clues = {key: [line[:] for line in known_clues[key]]
+                 for key in ("row_clues", "col_clues")}
+        clue_cache_hit = True
+    elif clue_cache is not None and not debug_dir:
+        # Match the complete clue silhouettes, not a fuzzy image similarity.
+        # Ignore text color (games recolor completed clues); retain every ink pixel.
+        geometry = np.asarray([*img.shape, *board_h_grid, *board_v_grid], dtype=np.int64).tobytes()
+        signature = (geometry + _ink_mask(row_clue_img).tobytes() +
+                     _ink_mask(col_clue_img).tobytes())
+        clues, clue_cache_hit = clue_cache.get_or_compute(signature, read_clues)
+    else:
+        clues = read_clues()
+    row_clues, col_clues = clues["row_clues"], clues["col_clues"]
 
     current = read_board_cells(img, v_lines, h_lines, vs, ve, hs, he)
 
@@ -1244,6 +1271,13 @@ def ocr_nonogram(img_path, debug_dir=None):
         "col_clues": col_clues,
         "current": current,
     }
+
+    if known_clues is not None:
+        result["continued_puzzle"] = continued_puzzle
+    if clue_cache is not None:
+        result["clue_cache_hit"] = clue_cache_hit or cache_stats["hits"] > 0
+        result["clue_cache_hits"] = nrows + ncols if clue_cache_hit else cache_stats["hits"]
+        result["clue_cache_total"] = nrows + ncols
 
     if debug_dir:
         with open(os.path.join(debug_dir, "raw_ocr.json"), "w", encoding="utf-8") as f:

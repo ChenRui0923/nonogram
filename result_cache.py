@@ -9,7 +9,7 @@ import threading
 import time
 
 # Bump when recognition, solver semantics, or the cached response schema changes.
-CACHE_VERSION = 'v0.1.5'
+CACHE_VERSION = 'v0.1.6'
 
 
 def default_cache_path():

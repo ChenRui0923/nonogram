@@ -5,7 +5,7 @@ import sys
 import tempfile
 import time
 
-from result_cache import ResultCache
+from result_cache import ResultCache, CACHE_VERSION
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
@@ -23,6 +23,12 @@ from solver import Solver, UNKNOWN
 HOST = "127.0.0.1"
 PORT = 8765
 RESULT_CACHE = ResultCache()
+CLUE_CACHE = ResultCache(path=RESULT_CACHE.path.with_name("clues.sqlite3"),
+                         version=CACHE_VERSION + ":clues")
+CLUE_STRIP_CACHE = ResultCache(path=CLUE_CACHE.path.with_name("clue-strips.sqlite3"),
+                              max_entries=512, version=CACHE_VERSION + ":strips")
+SOLUTION_CACHE = ResultCache(path=RESULT_CACHE.path.with_name("solutions.sqlite3"),
+                             version=CACHE_VERSION + ":solutions")
 # In a PyInstaller bundle resources are unpacked under ``sys._MEIPASS``.
 # Keep source-tree execution working while allowing web_index.html to be
 # included as a bundled data file.
@@ -107,20 +113,34 @@ def collect_hints(current, solution, rows, cols):
     return hints
 
 
-def solve_data(data):
+def solve_data(data, solution_cache=None):
     rows = data["row_clues"]
     cols = data["col_clues"]
     current = data.get("current")
-    solution = Solver(rows, cols, current).solve() if current else Solver(rows, cols).solve()
-    # Existing marks can be wrong. Keep the diagnostics, but still produce the
-    # clue-only solution so the UI can show the user what the board should be.
-    if solution is None and current:
-        solution = Solver(rows, cols).solve()
+    solution_cache_hit = False
+    # Only a clue-only solution completed by propagation is provably unique.
+    # Reusing an arbitrary solution on a multi-solution puzzle would flag valid moves.
+    reusable = None
+    if solution_cache is not None:
+        key = json.dumps([rows, cols], separators=(",", ":")).encode()
+        def propagate_clues():
+            probe = Solver(rows, cols)
+            consistent = probe.propagate()
+            unique = consistent and probe.get_filled_count() == len(rows) * len(cols)
+            return {"unique_solution": probe.board if unique else None}
+        entry, solution_cache_hit = solution_cache.get_or_compute(key, propagate_clues)
+        reusable = entry["unique_solution"]
+    if reusable is not None:
+        solution = reusable
+    else:
+        solution = Solver(rows, cols, current).solve() if current else Solver(rows, cols).solve()
+        if solution is None and current:
+            solution = Solver(rows, cols).solve()
     issues = validate_current_board(current, rows, cols) if current else []
     errors = find_errors(current, solution) if current and solution else []
     hints = collect_hints(current, solution, rows, cols)
     filled, total = progress(current) if current else (0, len(rows) * len(cols))
-    return {
+    result = {
         "row_clues": rows,
         "col_clues": cols,
         "current": current,
@@ -133,16 +153,22 @@ def solve_data(data):
         "total": total,
         "solvable": solution is not None,
     }
+    if solution_cache is not None:
+        result["solution_cache_hit"] = solution_cache_hit and reusable is not None
+    return result
 
 
-def recognize_image(image, suffix=".png"):
+def recognize_image(image, suffix=".png", known_clues=None):
     temp_path = None
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
             f.write(image)
             temp_path = f.name
-        data = validate_and_fix(ocr_nonogram(temp_path))
-        return solve_data(data)
+        data = validate_and_fix(ocr_nonogram(temp_path, clue_cache=CLUE_CACHE, strip_cache=CLUE_STRIP_CACHE, known_clues=known_clues))
+        result = solve_data(data, solution_cache=SOLUTION_CACHE)
+        for field in ("clue_cache_hit", "clue_cache_hits", "clue_cache_total", "continued_puzzle"):
+            result[field] = data.get(field, False if field in ("clue_cache_hit", "continued_puzzle") else 0)
+        return result
     finally:
         if temp_path:
             os.unlink(temp_path)
@@ -187,11 +213,27 @@ class Handler(BaseHTTPRequestHandler):
         marker = b"--" + boundary
         parts = payload.split(marker)
         image = None
+        known_clues = None
+        invalid_clues = False
         filename = "upload.png"
         for part in parts:
             if b"\r\n\r\n" not in part:
                 continue
             headers, content = part.split(b"\r\n\r\n", 1)
+            if b'name="continue_clues"' in headers:
+                try:
+                    known_clues = json.loads(content[:-2] if content.endswith(b"\r\n") else content)
+                    rows, cols = known_clues["row_clues"], known_clues["col_clues"]
+                    if not (isinstance(rows, list) and isinstance(cols, list) and
+                            1 <= len(rows) <= 200 and 1 <= len(cols) <= 200):
+                        raise ValueError("Invalid puzzle dimensions")
+                    for lines, length in ((rows, len(cols)), (cols, len(rows))):
+                        if not all(isinstance(line, list) and len(line) <= length and
+                                   all(type(n) is int and 0 < n <= length for n in line) for line in lines):
+                            raise ValueError("Invalid clues")
+                except (ValueError, KeyError, TypeError):
+                    invalid_clues = True
+                continue
             if b'name="image"' not in headers:
                 continue
             if b'filename="' in headers:
@@ -199,7 +241,11 @@ class Handler(BaseHTTPRequestHandler):
                     "utf-8", "ignore"
                 )
             image = content[:-2] if content.endswith(b"\r\n") else content
-            break
+            # Continue parsing: multipart field order is not significant.
+
+        if invalid_clues:
+            self._send(400, {"error": "上一题线索无效，请取消继续上一题并重新识别"})
+            return
 
         if not image:
             self._send(400, {"error": "没有找到图片文件"})
@@ -208,8 +254,9 @@ class Handler(BaseHTTPRequestHandler):
         suffix = os.path.splitext(filename)[1].lower() or ".png"
         try:
             started = time.perf_counter()
+            cache_key = image if known_clues is None else image + b"\0" + json.dumps(known_clues, sort_keys=True).encode()
             result, cache_hit = RESULT_CACHE.get_or_compute(
-                image, lambda: recognize_image(image, suffix))
+                cache_key, lambda: recognize_image(image, suffix, known_clues))
             self._send(200, {**result, "cache_hit": cache_hit,
                              "elapsed_seconds": round(time.perf_counter() - started, 3)})
         except Exception as exc:
