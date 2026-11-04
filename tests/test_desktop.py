@@ -19,9 +19,9 @@ def no_gui(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 builtins.__import__ = no_gui
 sys.stdout = sys.stderr = None
-sys.argv = ['desktop_launcher.py', '--smoke-test', '--port', '0']
+sys.argv = ['desktop_entry.py', '--smoke-test', '--port', '0']
 runpy.run_path('packaging/runtime_diagnostics.py')
-runpy.run_path('desktop_launcher.py', run_name='__main__')
+runpy.run_path('packaging/desktop_entry.py', run_name='__main__')
 '''
         with tempfile.TemporaryDirectory() as directory:
             log = Path(directory) / 'startup.log'

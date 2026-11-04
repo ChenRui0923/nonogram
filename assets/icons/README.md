@@ -1,13 +1,10 @@
-# Nonogram 应用图标
+# nonogram助手图标
 
-使用已确认的 [C 款修正版](../../docs/icon-concepts/nonogram-c-corrected.png)，保留白色圆角底、青绿网格和橙色提示框。外部为透明通道，无灰色方形背景；导出时应用抗锯齿圆角轮廓。应用显示名为 `nonogram助手`。
+- [source.png](source.png)：已确认的青绿数织图标源稿。
+- [nonogram.png](nonogram.png)：1024×1024 展示与转换结果。
+- `nonogram.ico`：Windows 多尺寸（16、24、32、48、64、128、256）。
+- `nonogram.icns`：macOS 多尺寸，最大 1024×1024。
 
-- `nonogram.png`：1024×1024 原生图标转换源，可用于文档展示。
-- `nonogram.ico`：Windows 多尺寸图标（16、24、32、48、64、128、256）。
-- `nonogram.icns`：macOS 多尺寸图标，最大 1024×1024。
+白色圆角外部为透明通道，导出时应用抗锯齿轮廓，不包含灰色方形背景。
 
-Windows 的 `nonogram.spec` 与 macOS 的 `nonogram_macos.spec` 已引用相应文件，重新打包后生效。原有安装包不会自动更换图标。
-
-重新生成：`python packaging/build_icons.py`，需要 Pillow。
-
-透明源稿为 `docs/icon-concepts/nonogram-c-transparent.png`，旧的灰底对比稿仅用于设计回顾。
+从仓库根目录执行 `python packaging/build_icons.py` 可重新生成，需要 Pillow。Windows 的 `packaging/windows.spec` 和 macOS 的 `packaging/macos.spec` 已引用对应文件；原有安装包不会自动更新图标，需要重新打包。

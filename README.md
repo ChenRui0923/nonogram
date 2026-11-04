@@ -23,7 +23,7 @@
 
 ## 使用教程
 
-以下图片来自本项目 Web 界面的真实操作，示例为仓库中的 [`debug.png`](debug.png)（50×50）。桌面版使用同一界面；截图不是 Windows/macOS 原生窗口的实机验收图。
+以下图片来自本项目 Web 界面的真实操作，示例为仓库中的 [`debug.png`](examples/images/debug.png)（50×50）。桌面版使用同一界面；截图不是 Windows/macOS 原生窗口的实机验收图。
 
 ### 1. 选择一张完整截图
 
@@ -65,7 +65,7 @@
 如果某个数字识别错了，可编辑导出的 JSON，再用命令行求解：
 
 ```bash
-python main.py /path/to/puzzle.json
+python -m nonogram /path/to/puzzle.json
 ```
 
 当前网页没有 JSON 导入或直接修改提示数字的功能。
@@ -80,7 +80,7 @@ python main.py /path/to/puzzle.json
 
 **为什么有时慢？**程序会依次识别、求解并生成提示。示例 `debug.png` 在开发云环境中首次 OCR 加求解约 2.5 秒，其中求解和提示约 0.6 秒；不是所有机器或题目的耗时保证。需要大量回溯的题目仍可能更慢，Windows 单文件程序首次解包启动也需要额外时间。
 
-**端口被占用？**关闭之前启动的程序，或从终端指定新端口：Windows 为 `nonogram助手.exe --port 9000`；源码 Web 版为 `python web_app.py --port 9000`。
+**端口被占用？**关闭之前启动的程序，或从终端指定新端口：Windows 为 `nonogram助手.exe --port 9000`；源码 Web 版为 `python -m nonogram.web_app --port 9000`。
 
 ## 连续做题：自动匹配与缓存
 
@@ -104,7 +104,7 @@ python main.py /path/to/puzzle.json
 
 最多保留 32 份整图结果、32 份线索区结果、32 份解答、512 条线索，以及 **4 份自动对齐参考**。参考仅保留线索区图像和几何信息，玩家填写区域被清白；不保留完整上传图片。单记录最大 2 MiB，失败请求不缓存，缓存不可写时回退到正常识别。算法和格式升级时更新版本，防止旧缓存混用。
 
-关闭应用后删除目录中的 `*.sqlite3` 可清空缓存。更多测量方法见 [性能验证记录](docs/performance.md)。
+关闭应用后删除目录中的 `*.sqlite3` 可清空缓存。更多测量方法见 [性能验证记录](docs/development/performance.md)。
 
 ## 从源码运行
 
@@ -115,8 +115,8 @@ python -m venv .venv
 # macOS / Linux
 source .venv/bin/activate
 # Windows PowerShell 则执行：.\.venv\Scripts\Activate.ps1
-python -m pip install opencv-python numpy pillow pytesseract
-python web_app.py
+python -m pip install -r requirements/runtime.txt
+python -m nonogram.web_app
 ```
 
 浏览器打开 `http://127.0.0.1:8765`。Web 服务使用 Python 标准库，无需 Flask/FastAPI。Tesseract 是可选的外部 OCR 引擎，内置字体模板识别无需安装它。
@@ -125,20 +125,20 @@ python web_app.py
 
 ```bash
 # 截图识别并求解，显式指定输出路径
-python main.py debug.png --save-json /tmp/nonogram-result.json
+python -m nonogram examples/images/debug.png --save-json /tmp/nonogram-result.json
 # Windows 可将输出路径改为 result.json
 
 # 只识别，不求解
-python main.py --ocr-only debug.png result.json
+python -m nonogram --ocr-only examples/images/debug.png result.json
 
 # 从 JSON 求解
-python main.py result.json
+python -m nonogram result.json
 
 # OCR 调试输出到当前目录的 debug_ocr/
-python main.py debug.png --save-json result.json --debug
+python -m nonogram examples/images/debug.png --save-json result.json --debug
 ```
 
-注意：未指定输出路径时，图片识别默认覆盖仓库中的 `puzzle.json`；`--debug` 会写入 `debug_ocr/`。需要保留原数据时，请显式指定输出路径，并备份调试文件。
+未指定输出路径时，图片识别保存到当前工作目录的 `outputs/puzzle.json`；`--debug` 写入 `outputs/debug_ocr/`。这些目录已加入 Git 忽略规则，不会覆盖示例素材。
 
 JSON 示例：
 
@@ -152,70 +152,25 @@ JSON 示例：
 
 `row_clues` 从上到下，`col_clues` 从左到右；`current` 可省略。格子使用 `O`（黑格）、`X`（空格）、`.`（未知）。
 
-## 开发、打包与 Release
+## 开发与目录导航
 
-### 测试
+- [开发、测试、打包与发布](docs/development/README.md)
+- [示例图片和题目说明](examples/README.md)
+- [性能验证记录](docs/development/performance.md)
+- [图像鲁棒性测试报告](docs/development/robustness.md)
+- [应用图标与源稿](assets/icons/README.md)
 
-```bash
-python -B -m unittest discover -s tests -v
+```text
+nonogram/           程序源码（OCR、求解、缓存、桌面与 Web）
+  web/index.html    Web 界面
+assets/             应用图标、图标源稿、字体及许可
+examples/           示例图片、JSON 题目
+packaging/          PyInstaller 配置、图标转换、启动诊断
+scripts/build/      Windows / macOS 本地打包脚本
+requirements/       运行与打包依赖
+tests/             自动测试、可选鲁棒性测量脚本
+tools/              OCR 对照检查工具
+docs/               使用截图、开发与验证文档
 ```
 
-测试覆盖短线索的穷举对照、无解和零线索，以及 `debug.png` 的真实 OCR、50×50 求解和冲突位置回归。
-
-有匹配的截图与标准 JSON 时，也可运行 `python ocr_selftest.py screenshot.png reference.json`；退出码 2 表示存在差异。不要将不同填写进度的图片和 JSON 当作匹配测试素材。
-
-### 在目标系统本地打包
-
-PyInstaller 不支持在 Linux 上直接生成 Windows/macOS 原生程序，请在对应系统运行：
-
-```powershell
-# Windows PowerShell
-.\build_windows.ps1
-# 输出 dist\nonogram助手.exe
-```
-
-```bash
-# macOS
-bash build_macos.sh
-bash build_dmg.sh
-# 输出 dist/nonogram助手.app 和 dist/Nonogram-macOS.dmg
-```
-
-依赖位于 `requirements-build.txt`。打包程序支持无窗口启动检查：
-
-```bash
-# Windows
-.\dist\nonogram助手.exe --smoke-test --port 0
-# macOS
-./dist/nonogram助手.app/Contents/MacOS/nonogram助手 --smoke-test --port 0
-```
-
-打包版本的检查日志默认写到系统临时目录 `nonogram-smoke.log`，可通过 `NONOGRAM_STARTUP_LOG` 指定路径；检查不打开 WebView 窗口，验证 HTTP 页面、内置字体和基本求解。完整图形界面、剪贴板和系统安全提示仍需要目标系统实机验收。
-
-### 自动构建与版本发布
-
-[Desktop builds and releases](https://github.com/ChenRui0923/nonogram/actions) 工作流先测试，再分别在 Windows x64、macOS Intel 和 Apple Silicon 上打包。所有任务通过后才上传三个安装包、依赖清单与 SHA-256 校验值到 Release。
-
-```bash
-# 使用尚未发布过的新版本号；不要覆盖旧标签
-git push origin HEAD:main
-git tag v0.1.1
-git push origin v0.1.1
-```
-
-也可以在 Actions → Desktop builds and releases → Run workflow 手动构建：这种方式只产生 Actions artifacts，不发布正式版本。仓库需要启用 Actions；发布任务需要 `GITHUB_TOKEN` 的 `contents: write` 权限。
-
-Windows 启动检查超时时，请查看该步骤输出和 `windows-startup-diagnostics` 附件。日志包含阶段信息；Python 启动后卡住超过 90 秒时会保存线程堆栈。如果没有日志，说明程序尚未进入 Python runtime hook，需要排查单文件解包或系统拦截。Node.js 弃用警告和程序启动失败是两类问题，应以失败步骤的实际错误为准。
-
-### 文件结构
-
-| 路径 | 用途 |
-| --- | --- |
-| `desktop_launcher.py` | 桌面窗口、原生剪贴板、无窗口启动检查 |
-| `web_app.py` / `web_index.html` | 本地 HTTP 接口与界面 |
-| `main.py` | 命令行识别、求解和诊断 |
-| `ocr_nonogram.py` / `assets/fonts/` | 网格检测、数字和棋盘识别、模板字体及许可 |
-| `solver.py` / `hint.py` | 约束传播、回溯搜索、冲突检查和提示 |
-| `tests/` | 回归测试 |
-| `docs/screenshots/` | 实际使用截图 |
-| `.github/workflows/release.yml` | 多平台构建与 Release |
+从仓库根目录执行 `python -m nonogram` 启动命令行，`python -m nonogram.web_app` 启动 Web，`python -m nonogram.desktop` 启动桌面（需安装打包/桌面依赖）。桌面打包入口位于 `packaging/desktop_entry.py`。`outputs/`、`build/`、`dist/` 和 Python 缓存属于本地生成物，不提交到仓库。

@@ -1,7 +1,7 @@
 import itertools
 from pathlib import Path
 import unittest
-from solver import solve_line, generate_patterns, compatible
+from nonogram.solver import solve_line, generate_patterns, compatible
 
 
 class LineConsensusTests(unittest.TestCase):
@@ -21,9 +21,9 @@ class LineConsensusTests(unittest.TestCase):
                                      (length, clues, current))
 
     def test_large_puzzle_solution_and_conflicts(self):
-        from web_app import solve_data
-        from ocr_nonogram import ocr_nonogram, validate_and_fix
-        fixture = Path(__file__).resolve().parents[1] / 'debug.png'
+        from nonogram.web_app import solve_data
+        from nonogram.ocr_nonogram import ocr_nonogram, validate_and_fix
+        fixture = Path(__file__).resolve().parents[1] / 'examples/images/debug.png'
         puzzle = validate_and_fix(ocr_nonogram(str(fixture)))
         self.assertEqual(len(puzzle['row_clues']), 50)
         result = solve_data(puzzle)

@@ -1,13 +1,13 @@
 """Convert the approved icon artwork into desktop packaging formats.
 
 Run with: python packaging/build_icons.py
-Requires Pillow (already included in requirements-build.txt).
+Requires Pillow (already included in requirements/build.txt).
 """
 from pathlib import Path
 from PIL import Image, ImageChops, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / 'docs/icon-concepts/nonogram-c-transparent.png'
+SOURCE = ROOT / 'assets/icons/source.png'
 OUTPUT = ROOT / 'assets/icons'
 
 

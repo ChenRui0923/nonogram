@@ -1,6 +1,0 @@
-pyinstaller>=6.0
-opencv-python
-numpy
-pillow
-pytesseract
-pywebview

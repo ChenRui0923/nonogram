@@ -1,7 +1,7 @@
 import unittest
 import cv2
 import numpy as np
-from ocr_nonogram import _glyph_score, _GLYPH_SHIFTS
+from nonogram.ocr_nonogram import _glyph_score, _GLYPH_SHIFTS
 
 
 class GlyphScoreTests(unittest.TestCase):

@@ -15,9 +15,9 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-import ocr_nonogram as ocr
-from result_cache import ResultCache
-from visual_puzzle_cache import VisualPuzzleCache
+from nonogram import ocr_nonogram as ocr
+from nonogram.result_cache import ResultCache
+from nonogram.visual_puzzle_cache import VisualPuzzleCache
 
 
 def transformed_images(image):
@@ -62,14 +62,14 @@ def main():
         raise TimeoutError('Per-case OCR limit of 10 seconds exceeded')
     if hasattr(signal, 'SIGALRM'):
         signal.signal(signal.SIGALRM, timeout)
-    for reference_name, target_name in [('debug.png', 'debug2.png'), ('image.png', 'image copy.png')]:
-        baseline = ocr.ocr_nonogram(str(ROOT / target_name))
+    for reference_name, target_name in [('debug.png', 'debug2.png'), ('progress-30x25.png', 'progress-30x25-later.png')]:
+        baseline = ocr.ocr_nonogram(str(ROOT / "examples/images" / target_name))
         with tempfile.TemporaryDirectory() as folder:
             store = ResultCache(Path(folder) / 'references.db', max_entries=4)
             visual = VisualPuzzleCache(store)
-            ocr.ocr_nonogram(str(ROOT / reference_name), visual_cache=visual)
+            ocr.ocr_nonogram(str(ROOT / "examples/images" / reference_name), visual_cache=visual)
             reference = visual.entries[0]
-            image = cv2.imread(str(ROOT / target_name))
+            image = cv2.imread(str(ROOT / "examples/images" / target_name))
             for name, changed in transformed_images(image):
                 if (reference_name + ' -> ' + target_name, name) in done:
                     continue
@@ -98,13 +98,13 @@ def main():
                 print(json.dumps(item, ensure_ascii=False), flush=True)
                 (output/'results.json').write_text(json.dumps(results, ensure_ascii=False, indent=2))
             # Genuine other screenshots: no same-puzzle reuse is permitted.
-            for other in ['image.png', 'debug.png', '微信图片_2026-10-08_155212_686.jpg']:
+            for other in ['progress-30x25.png', 'debug.png', 'unsupported-mobile.jpg']:
                 if other == reference_name:
                     continue
                 visual = VisualPuzzleCache(store)
                 visual.entries = [reference]
                 started = time.perf_counter()
-                _, match = visual.align(cv2.imread(str(ROOT / other)))
+                _, match = visual.align(cv2.imread(str(ROOT / "examples/images" / other)))
                 item = {'pair': reference_name + ' -> other', 'case': other, 'negative': True,
                         'reused': match is not None, 'seconds': round(time.perf_counter()-started, 4)}
                 results.append(item)

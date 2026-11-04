@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import unittest
 
-from result_cache import ResultCache
+from nonogram.result_cache import ResultCache
 
 
 class ResultCacheTests(unittest.TestCase):

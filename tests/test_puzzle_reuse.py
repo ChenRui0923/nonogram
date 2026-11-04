@@ -4,10 +4,10 @@ import unittest
 from unittest.mock import patch
 import cv2
 
-import ocr_nonogram as ocr
-from result_cache import ResultCache
-from web_app import solve_data
-from solver import Solver
+from nonogram import ocr_nonogram as ocr
+from nonogram.result_cache import ResultCache
+from nonogram.web_app import solve_data
+from nonogram.solver import Solver
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -17,9 +17,9 @@ class PuzzleReuseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             cache = ResultCache(Path(folder) / 'clues.db')
             solution_cache = ResultCache(Path(folder) / 'solutions.db')
-            original = ocr.ocr_nonogram(str(ROOT / 'debug.png'), clue_cache=cache)
+            original = ocr.ocr_nonogram(str(ROOT / 'examples/images/debug.png'), clue_cache=cache)
             result = solve_data(original, solution_cache=solution_cache)
-            image = cv2.imread(str(ROOT / 'debug.png'))
+            image = cv2.imread(str(ROOT / 'examples/images/debug.png'))
             v, h = ocr.detect_grid_lines(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY))
             vs, ve, hs, he = ocr.find_board_region(v, h)
             r, c = 20, 20
@@ -44,14 +44,14 @@ class PuzzleReuseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             cache = ResultCache(Path(folder) / 'headers.db')
             strips = ResultCache(Path(folder) / 'strips.db', max_entries=512)
-            ocr.ocr_nonogram(str(ROOT / 'image.png'), clue_cache=cache, strip_cache=strips)
-            changed = ocr.ocr_nonogram(str(ROOT / 'image copy.png'), clue_cache=cache, strip_cache=strips)
+            ocr.ocr_nonogram(str(ROOT / 'examples/images/progress-30x25.png'), clue_cache=cache, strip_cache=strips)
+            changed = ocr.ocr_nonogram(str(ROOT / 'examples/images/progress-30x25-later.png'), clue_cache=cache, strip_cache=strips)
             self.assertGreater(changed['clue_cache_hits'], 0)
             self.assertLess(changed['clue_cache_hits'], 55)
-            fresh = ocr.ocr_nonogram(str(ROOT / 'image copy.png'))
+            fresh = ocr.ocr_nonogram(str(ROOT / 'examples/images/progress-30x25-later.png'))
             for key in ('row_clues', 'col_clues', 'current'):
                 self.assertEqual(changed[key], fresh[key])
-            image = cv2.imread(str(ROOT / 'image copy.png'))
+            image = cv2.imread(str(ROOT / 'examples/images/progress-30x25-later.png'))
             v, h = ocr.detect_grid_lines(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY))
             vs, ve, hs, he = ocr.find_board_region(v, h)
             image[h[hs]+3:h[hs+1]-3, :v[vs]-3] = 255  # Remove just one clue.

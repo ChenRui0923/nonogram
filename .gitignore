@@ -1,5 +1,20 @@
-build/
-dist/
+# Python environments and caches
+.venv/
 .build-venv/
-.DS_Store
 __pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Generated builds, runtime output and diagnostics
+/build/
+/dist/
+/release/
+/outputs/
+/debug_ocr/
+/build-dependencies.txt
+
+# OS metadata
+.DS_Store
+Thumbs.db

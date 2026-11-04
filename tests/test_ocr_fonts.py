@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from PIL import ImageFont
-import ocr_nonogram as ocr
+from nonogram import ocr_nonogram as ocr
 
 
 class FontTemplateTests(unittest.TestCase):
