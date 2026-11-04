@@ -1,277 +1,160 @@
 # Nonogram 助手
 
-一个本地运行的Nonogram（数织/逻辑拼图）工具，支持：
-- 📷 **本地OCR识别**：直接从截图识别提示数字和当前棋盘
-- 🧩 **智能求解**：约束传播 + 回溯搜索的高效求解器
-- ❌ **错误检测**：对比解答，指出当前填写错误的格子
-- 💡 **下一步提示**：结合推理逻辑给出"为什么填这个"的解释（交叠法/枚举消去法/搜索消去法）
-- 🎯 **矛盾预警**：当前填写与行/列提示矛盾时提前警告
+本地运行的数织（Nonogram）截图识别与求解工具：识别行列数字和当前棋盘、生成完整解答、检查填写冲突，并给出下一步提示。图片由本机处理，不需要上传到在线 OCR 服务。
 
-## 安装依赖
+支持 Windows / macOS 桌面窗口，也可以直接运行 Python Web 版或命令行版。
 
-```bash
-pip3 install --break-system-packages opencv-python numpy pillow pytesseract
-# 可选：安装 tesseract 以获得更好的数字识别（纯模板匹配也可用）
-# brew install tesseract tesseract-lang
-```
+## 下载与安装
 
-## 使用方法
+打开 [GitHub Releases](https://github.com/ChenRui0923/nonogram/releases)，选择一个**已发布且带下载附件**的版本，在 Assets 中下载对应文件。构建进度见 [Actions](https://github.com/ChenRui0923/nonogram/actions)；标签存在或 Actions 启动不代表安装包已经生成。所有平台构建通过后才发布 Release。
 
-### 1. 从截图直接识别+求解（推荐）
+| 系统 | 下载文件 | 使用方式 |
+| --- | --- | --- |
+| Windows 10/11 x64 | `Nonogram-windows-x64.exe` | 双击运行 |
+| macOS Apple Silicon（M 系列） | `Nonogram-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| macOS Intel | `Nonogram-macos-x64.dmg` | 打开 DMG，将 App 拖入 Applications |
 
-```bash
-# 直接求解；OCR 结果默认覆盖保存到仓库里的 puzzle.json，然后直接求解
-python3 main.py screenshot.png
+- 桌面包无需安装 Python、字体或 Tesseract。
+- Windows 界面使用 Microsoft Edge WebView2；如提示缺少运行库，安装 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)。
+- macOS 使用系统 WebKit。当前版本尚无开发者证书签名和 Apple 公证；确认下载来源后，可在系统“隐私与安全性”中按提示允许打开。
+- Release 中的 `SHA256SUMS.txt` 可用于核对下载完整性，`dependencies-*.txt` 记录各平台实际打包依赖。
 
-# 想存到别处
-python3 main.py screenshot.png --save-json out.json
+## 使用教程
 
-# 只做OCR，输出JSON（方便手动修正数字后再求解）
-python3 main.py --ocr-only screenshot.png          # 默认还是 puzzle.json
-python3 main.py --ocr-only screenshot.png out.json # 指定路径
+以下图片来自本项目 Web 界面的真实操作，示例为仓库中的 [`debug.png`](debug.png)（50×50）。桌面版使用同一界面；截图不是 Windows/macOS 原生窗口的实机验收图。
 
-# 带调试输出，保存识别过程图片（debug_ocr/ 目录）
-python3 main.py screenshot.png --debug
-```
+### 1. 选择一张完整截图
 
-> OCR 结果每次都覆盖保存到 `puzzle.json`（路径固定为 `main.py` 所在目录，
-> 和你在哪个目录执行无关，终端会打印绝对路径），`--save-json` 或第二个位置参数
-> 可以改成别的文件。识别后如果结果不对，直接改 `puzzle.json` 再
-> `python3 main.py puzzle.json` 复算即可。
+打开应用，点击 **选择图片**。桌面版也可以复制截图后点击 **从剪贴板粘贴**。选中后点击 **开始识别**。
 
-### 2. 从 JSON 文件求解
+截图应包含完整棋盘、顶部列提示、左侧行提示；尽量保持网格水平、文字清晰，避免裁掉边缘、旋转或透视变形。
 
-```bash
-python3 main.py puzzle.json
-```
+![选择图片后，点击开始识别](docs/screenshots/01-select-image.png)
 
-### 3. 打包成 Windows / macOS 应用
+浏览器版的剪贴板功能依赖浏览器权限；粘贴失败时直接选择图片即可。
 
-需要在目标系统上构建（PyInstaller 不能跨平台生成原生应用）。首次构建会安装打包依赖：
+### 2. 查看识别棋盘与冲突
 
-```bash
-# Windows（PowerShell，推荐）
-Set-ExecutionPolicy -Scope Process Bypass
-.\build_windows.ps1
-# 或直接双击 build_windows.bat
-build_windows.bat
-# 输出 dist\\Nonogram.exe；双击后显示独立应用窗口
+识别完成后，左侧显示当前棋盘，右侧显示尺寸、已标记格数和下一步提示。
 
-# macOS
-chmod +x build_macos.sh
-./build_macos.sh
-# 输出 dist/Nonogram.app；双击后显示独立应用窗口
-```
+- 深色格：已填黑格；红色 `×`：已标记空格；白格：未知。
+- 橙框：识别出的已有填写与求得解答不一致；先核对原图与提示数字，再修改游戏中的填写。
+- 蓝框：右侧当前提示对应的位置。点击 **刷新提示** 切换已有提示。
+- 红色警告表示当前填写与行列约束矛盾，并不一定代表题目本身无解。
+- 右侧行提示、列提示列表用于人工核对，内容可在各栏内滚动；它们与棋盘边缘的线索重复。
 
-应用启动后会在本机运行 HTTP 服务，并在应用内显示界面。如端口被占用，
-可以从命令行启动并指定端口，例如 `Nonogram.exe --port 9000`。
+![真实识别结果：50×50 棋盘、填写冲突和下一步提示](docs/screenshots/02-recognized-board.png)
 
-Windows 版本使用 Microsoft Edge WebView2。Windows 11 通常已自带；Windows 10
-如果没有，需要先安装 WebView2 Runtime。应用内置 WebView 窗口，不依赖外部浏览器。
+示例图识别为 50×50，已有标记为 362/2500；完整解答与这些标记有 8 处冲突。没有标准答案时，不能仅凭“求出了一个解”就认定所有 OCR 数字都正确。
 
-macOS 应用使用系统 WebKit。macOS 版本需要在 macOS 上构建，Windows 版本需要在
-Windows 上构建；PyInstaller 不负责跨平台交叉编译。构建产物不需要目标机器安装 Python。
+### 3. 缩放与显示完整解答
 
-启动应用后，直接复制一张 Nonogram 截图，在网页中点击“📋 从剪贴板粘贴”，然后点击
-“开始识别”。macOS 版本通过原生 NSPasteboard 读取剪贴板，Windows 版本通过 Pillow
-读取系统剪贴板，不依赖浏览器剪贴板授权。
+棋盘默认 **适应宽度**，无需横向拖动即可看到全部列。小窗口下数字会相应缩小；需要看清细节时，切换到 **100% / 150% / 200%**，再在棋盘区域滚动。
 
-若 macOS 首次打开被系统拦截：在 Finder 中右键 `Nonogram.app`，选择“打开”；或执行：
+勾选棋盘下方的 **显示完整解答** 查看结果，取消勾选返回识别出的当前棋盘。页面较长时向下滚动即可找到开关。
+
+![勾选显示完整解答后的实际界面](docs/screenshots/03-solution.png)
+
+### 4. 导出与修正识别结果
+
+点击顶部 **下载 JSON**，保存当前识别出的行列提示和棋盘。此按钮导出的是 OCR 数据，不是完整解答，也不会自动回填到游戏。
+
+如果某个数字识别错了，可编辑导出的 JSON，再用命令行求解：
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/Nonogram.app
+python main.py /path/to/puzzle.json
 ```
 
-### 4. 启动本地 Web 版
+当前网页没有 JSON 导入或直接修改提示数字的功能。
 
-Web 版不依赖 Flask/FastAPI，使用 Python 标准库提供本地 HTTP 服务：
+## 识别范围与常见问题
+
+**能保证各种比例的图都成功吗？**不能。求解器支持长方形棋盘，界面会随行列数和窗口宽度调整；OCR 则依赖截图字体、网格、清晰度和裁剪完整性。已验证仓库中的 30×25 和 50×50 示例；仓库中 1080×2400 的 JPG 未能检测到网格，不能保证任意长截图都可识别。
+
+**提示“题目无解”怎么办？**先核对顶部和左侧的提示数字，尤其是粘连的两位数；必要时重新裁剪清晰截图，或导出 JSON 人工修正。行列黑格总数相同只是初步检查，不证明识别完全正确。
+
+**有解但出现冲突格怎么办？**可能是当前填写有误，也可能是 OCR 识别有误；对照截图核对。命令行在仅凭行列推理确定唯一解时，会把差异标为确定错误；存在多解时不能把所有差异都归为玩家错误。
+
+**为什么有时慢？**程序会依次识别、求解并生成提示。示例 `debug.png` 在开发云环境中识别到页面显示约 4～5 秒，其中优化后的求解和提示约 0.6 秒；不是所有机器或题目的耗时保证。需要大量回溯的题目仍可能更慢，Windows 单文件程序首次解包启动也需要额外时间。
+
+**端口被占用？**关闭之前启动的程序，或从终端指定新端口：Windows 为 `Nonogram.exe --port 9000`；源码 Web 版为 `python web_app.py --port 9000`。
+
+## 从源码运行
+
+推荐 Python 3.12，使用独立虚拟环境：
 
 ```bash
-python3 web_app.py
+python -m venv .venv
+# macOS / Linux
+source .venv/bin/activate
+# Windows PowerShell 则执行：.\.venv\Scripts\Activate.ps1
+python -m pip install opencv-python numpy pillow pytesseract
+python web_app.py
 ```
 
-然后打开 <http://127.0.0.1:8765>，选择截图并点击“开始识别”。
+浏览器打开 `http://127.0.0.1:8765`。Web 服务使用 Python 标准库，无需 Flask/FastAPI。Tesseract 是可选的外部 OCR 引擎，内置字体模板识别无需安装它。
 
-页面会展示：
-
-- 原图预览和 OCR 识别出的行列提示
-- 当前棋盘状态，以及与解答冲突的格子
-- 题目是否可解、当前填写进度和下一步提示
-- “显示完整解答”切换
-- 识别结果 JSON 下载
-
-也可以指定监听地址和端口：
+### 命令行
 
 ```bash
-python3 web_app.py --host 127.0.0.1 --port 9000
+# 截图识别并求解，显式指定输出路径
+python main.py debug.png --save-json /tmp/nonogram-result.json
+# Windows 可将输出路径改为 result.json
+
+# 只识别，不求解
+python main.py --ocr-only debug.png result.json
+
+# 从 JSON 求解
+python main.py result.json
+
+# OCR 调试输出到当前目录的 debug_ocr/
+python main.py debug.png --save-json result.json --debug
 ```
 
-## JSON 格式
+注意：未指定输出路径时，图片识别默认覆盖仓库中的 `puzzle.json`；`--debug` 会写入 `debug_ocr/`。需要保留原数据时，请显式指定输出路径，并备份调试文件。
+
+JSON 示例：
 
 ```json
 {
-  "row_clues": [[3], [1,1], [1,1], [3]],
+  "row_clues": [[2], [2], [2], [2]],
   "col_clues": [[2], [2], [2], [2]],
-  "current": [
-    "O...",
-    "....",
-    "..X.",
-    "O.O."
-  ]
+  "current": ["OO..", "....", "..X.", "...."]
 }
 ```
 
-- `row_clues`: 每行的提示数字数组（从上到下）
-- `col_clues`: 每列的提示数字数组（从左到右）
-- `current`: 当前棋盘状态，可选
-  - `O` = 黑格（已填）
-  - `X` = 空格（标记为叉）
-  - `.` = 未知（未填）
+`row_clues` 从上到下，`col_clues` 从左到右；`current` 可省略。格子使用 `O`（黑格）、`X`（空格）、`.`（未知）。
 
-## 输出说明
+## 开发、打包与 Release
 
-```
-============================================================
-======================= Nonogram 助手 ========================
-============================================================
-棋盘大小: 4 行 × 4 列
-行提示总黑格: 12, 列提示总黑格: 12 ✓   ← 校验行列总数一致
-
-=========================== 当前棋盘 ===========================
-进度: 7/16 (43%)
-
-⚠️  当前状态冲突警告:                 ← 如果当前填法矛盾会提示
-  - 第N行/列与提示[x]矛盾，无可行解
-
-                  1   1     
-              4   1   1   4             ← 列提示
-            ────────────────
-      4 │  ██          ██              ← 行提示 + 棋盘 ██=黑格 ·X=空格
-    1 1 │      ·X                      ← 每5行/列有粗分隔线
-    1 1 │                 
-      4 │  ██  ██  ██  ██ 
-
-正在求解... 完成!
-
-========================= 完整解答 =========================
-... （解答棋盘）
-
-===================== 错误检查 (发现 N 个错误) ======================
-  1. R?C?: 当前 → 应为           ← 错误列表，<错误格> 在棋盘上用<>标记
-错误位置标记如下 <错误格>:
-...
-
-========================== 下一步提示 ==========================
-📍 位置: 第 N 行, 第 N 列
-🎯 应填: 黑格(O) / 空格(X)
-💡 推理: 第?行: 交叠法：提示[x]中...     ← 推理说明
-提示位置标记如下 (提示格):              ← (提示格) 在棋盘上用()标记
-```
-
-## 推理类型说明
-
-- **交叠法**：提示中的黑块无论怎么摆都必定覆盖的格子
-- **枚举消去**：该位置所有可行模式的取值都一致
-- **搜索消去**：结合行/列多步推理或搜索得出的结论
-
-## 关于"无解"与"当前棋盘有误"
-
-题目能不能解，只由 `row_clues` / `col_clues` 决定；`current` 只是你已经填的部分。
-所以两种情况会分开报：
-
-- **题目无解**：行/列提示互相矛盾，怎么填都不可能有解 → 大概率是 OCR/录入错误，按下面的步骤核对提示数字。
-- **当前棋盘有误**：提示本身有解（甚至唯一解），但你填的某些格子让它变得无解。此时工具会
-  先给出"仅凭提示推理出的解答"，再列出与你填写冲突的格子：
-
-  ```
-  ===================== 当前棋盘有误 (题目本身有解) ======================
-  提示经纯行列推理即可推满全盘 → 解答唯一，下面的格子一定是填错的：
-
-     1. R15C13: 当前=黑格(O) → 应为 空格(X)   [确定错误]
-
-    连锁冲突: 第 14 列 的提示 [1, 10, 11, 2] 在已有填写下无法满足
-  ```
-
-  当提示的解唯一（能被纯行列推理完全推出）时，差异格标为 `[确定错误]`；
-  提示有多个解时只标 `[可疑]`，因为那时无法唯一归因到某个格子。
-  若冲突格特别多（超过已填格子的 10% 且多于 5 个），工具会转而提示
-  "更可能是提示数字识别/录入有误"，让你先核对 `row_clues` / `col_clues`，
-  避免把一大片冲突都算到你的填写上。
-
-## 文件结构
-
-| 文件 | 作用 |
-|------|------|
-| `main.py` | 入口，集成OCR+求解+提示+可视化 |
-| `ocr_nonogram.py` | OCR模块：截图→提示数字+当前棋盘（本地，无需联网） |
-| `solver.py` | 求解器：约束传播+启发式回溯搜索 |
-| `hint.py` | 提示模块：智能推理+错误检测+进度计算 |
-| `renderer.py` | 可视化输出：带行/列提示+分隔线+高亮标记 |
-| `parser.py` | JSON加载 |
-| `ocr_selftest.py` | OCR 自测：拿截图和标准答案 JSON 逐项对比 |
-
-## OCR 识别不准时
-
-提示数字字体/样式特殊时，模板匹配可能有误差。遇到"无解"或结果不对时：
-
-1. 打开 `puzzle.json`（OCR 结果每次都会覆盖保存到这里）
-2. 对照图片核对修正 `row_clues` / `col_clues`
-3. `python3 main.py puzzle.json` 再求解
-
-## OCR 实现与自测
-
-提示区没有分隔线，数字之间的间距也不固定，所以识别走的是"先切字形、再认字形"的路线：
-
-1. 检测网格线 → 定位棋盘区域（`detect_grid_lines` / `find_board_region`）
-2. 提示区按棋盘的行/列切成一条条，二值化，并且**只清掉贯穿整条的直线**（边框、
-   每 5 格的分组线）。注意不能用"这一行黑像素多"来判定直线：相邻两位数字的底部
-   连起来也能占 80% 宽度，那样会把字形切掉一截。
-3. 二值化用的是**"暗 或 彩色"笔迹强度** `max(255-V, S)` 而不是灰度 Otsu：游戏会把
-   当前行/列的提示数字标成橙色（灰度约 140），同一条提示里又有黑字（灰度约 5）和
-   白底（255），灰度 Otsu 的阈值会夹在中间，橙色数字直接被当背景丢掉。改用笔迹强度后
-   黑字、橙字都拿高分，白底和浅色高亮底都很低。
-4. 连通域切出每个字形；像 `13`、`10`、`11` 这种粘连的两位数，沿投影谷值切开
-5. 按间距把字形聚成一个个"数字"（行提示横向排、列提示纵向堆叠）
-6. 每个字形按高度归一化后，与多种粗体字体的 0-9 模板做**带 ±2px 平移容差**的对称
-   距离匹配（Verdana/Tahoma/Arial/DejaVu/Liberation… 哪个装了用哪个，全都没装时退回
-   内置点阵模板，再不行退回旧的整格 OCR 路径）
-7. 棋盘格同样走 HSV：**暗且不饱和**算黑格，**饱和的彩色笔迹**（红/橙/蓝/绿都算）算叉号，
-    其余算空 —— 这样带底色的高亮行/列也不会误判成黑格。
-
-想验证识别效果，用一张截图和一份标准答案对比即可：
+### 测试
 
 ```bash
-python3 ocr_selftest.py Screenshots/PixPin_2026-09-24_17-31-14.png puzzle_gpt.json
+python -B -m unittest discover -s tests -v
 ```
 
-会分别报告行提示、列提示、当前棋盘的逐项差异和准确率，退出码非 0 表示存在不一致。
+测试覆盖短线索的穷举对照、无解和零线索，以及 `debug.png` 的真实 OCR、50×50 求解和冲突位置回归。
 
-## 下载桌面版与发布版本
+有匹配的截图与标准 JSON 时，也可运行 `python ocr_selftest.py screenshot.png reference.json`；退出码 2 表示存在差异。不要将不同填写进度的图片和 JSON 当作匹配测试素材。
 
-正式版本位于 [GitHub Releases](https://github.com/ChenRui0923/nonogram/releases)：
+### 在目标系统本地打包
 
-| 系统 | 下载文件 |
-| --- | --- |
-| Windows 10/11 x64 | `Nonogram-windows-x64.exe` |
-| macOS Apple Silicon（M 系列） | `Nonogram-macos-arm64.dmg` |
-| macOS Intel | `Nonogram-macos-x64.dmg` |
+PyInstaller 不支持在 Linux 上直接生成 Windows/macOS 原生程序，请在对应系统运行：
 
-无需安装 Python。Windows 需要 Edge WebView2 Runtime；macOS 打开 DMG 后将 App 拖入 Applications。当前发布流程没有开发者证书签名或 Apple 公证，首次运行可能出现系统安全提示。字体模板随应用分发，不要求用户安装字体或 Tesseract。图片的字体、清晰度和裁剪仍会影响 OCR。
-
-维护者发布新版本：
+```powershell
+# Windows PowerShell
+.\build_windows.ps1
+# 输出 dist\Nonogram.exe
+```
 
 ```bash
-# 提交代码后，推送 main 和版本标签（例：首版 v0.1.0）
-git push origin HEAD:main
-git tag v0.1.0
-git push origin v0.1.0
+# macOS
+bash build_macos.sh
+bash build_dmg.sh
+# 输出 dist/Nonogram.app 和 dist/Nonogram-macOS.dmg
 ```
 
-GitHub Actions 会先运行回归测试，再分别在 Windows、Intel Mac 和 Apple Silicon Mac 上打包，验证打包程序能启动 HTTP 服务、读取 HTML 和内置字体，并运行求解器。全部成功后才创建 Release 并上传三个下载包、依赖版本清单与 `SHA256SUMS.txt`。macOS/Windows 的完整图形界面及剪贴板仍需要实机验收。
-
-也可在 Actions → Desktop builds and releases → Run workflow 手动构建；这种方式只生成可下载的 Actions artifacts，不发布正式版本。需要仓库启用 GitHub Actions，并允许发布任务使用 `GITHUB_TOKEN` 写入 Releases。
-
-本地打包后可运行无窗口启动检查：
+依赖位于 `requirements-build.txt`。打包程序支持无窗口启动检查：
 
 ```bash
 # Windows
@@ -279,3 +162,33 @@ GitHub Actions 会先运行回归测试，再分别在 Windows、Intel Mac 和 A
 # macOS
 ./dist/Nonogram.app/Contents/MacOS/Nonogram --smoke-test --port 0
 ```
+
+打包版本的检查日志默认写到系统临时目录 `nonogram-smoke.log`，可通过 `NONOGRAM_STARTUP_LOG` 指定路径；检查不打开 WebView 窗口，验证 HTTP 页面、内置字体和基本求解。完整图形界面、剪贴板和系统安全提示仍需要目标系统实机验收。
+
+### 自动构建与版本发布
+
+[Desktop builds and releases](https://github.com/ChenRui0923/nonogram/actions) 工作流先测试，再分别在 Windows x64、macOS Intel 和 Apple Silicon 上打包。所有任务通过后才上传三个安装包、依赖清单与 SHA-256 校验值到 Release。
+
+```bash
+# 使用尚未发布过的新版本号；不要覆盖旧标签
+git push origin HEAD:main
+git tag v0.1.1
+git push origin v0.1.1
+```
+
+也可以在 Actions → Desktop builds and releases → Run workflow 手动构建：这种方式只产生 Actions artifacts，不发布正式版本。仓库需要启用 Actions；发布任务需要 `GITHUB_TOKEN` 的 `contents: write` 权限。
+
+Windows 启动检查超时时，请查看该步骤输出和 `windows-startup-diagnostics` 附件。日志包含阶段信息；Python 启动后卡住超过 90 秒时会保存线程堆栈。如果没有日志，说明程序尚未进入 Python runtime hook，需要排查单文件解包或系统拦截。Node.js 弃用警告和程序启动失败是两类问题，应以失败步骤的实际错误为准。
+
+### 文件结构
+
+| 路径 | 用途 |
+| --- | --- |
+| `desktop_launcher.py` | 桌面窗口、原生剪贴板、无窗口启动检查 |
+| `web_app.py` / `web_index.html` | 本地 HTTP 接口与界面 |
+| `main.py` | 命令行识别、求解和诊断 |
+| `ocr_nonogram.py` / `assets/fonts/` | 网格检测、数字和棋盘识别、模板字体及许可 |
+| `solver.py` / `hint.py` | 约束传播、回溯搜索、冲突检查和提示 |
+| `tests/` | 回归测试 |
+| `docs/screenshots/` | 实际使用截图 |
+| `.github/workflows/release.yml` | 多平台构建与 Release |

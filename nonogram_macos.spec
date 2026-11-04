@@ -5,7 +5,7 @@ a = Analysis(
     ["desktop_launcher.py"], pathex=["."],
     binaries=[], datas=[("web_index.html", "."), ("assets/fonts", "assets/fonts")],
     hiddenimports=["cv2", "numpy", "PIL", "pytesseract", "webview", "AppKit"] + collect_submodules("cv2"),
-    hookspath=[], hooksconfig={}, runtime_hooks=[], excludes=[], noarchive=False,
+    hookspath=[], hooksconfig={}, runtime_hooks=["packaging/runtime_diagnostics.py"], excludes=[], noarchive=False,
 )
 pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], [], [], name="Nonogram",
