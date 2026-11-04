@@ -20,15 +20,16 @@
     .status { color:var(--muted); }
     .layout { display:grid; grid-template-columns:minmax(0,1fr) 310px; gap:20px; align-items:start; }
     .preview { max-width:100%; max-height:260px; display:block; margin:0 0 14px; border:1px solid var(--line); border-radius:6px; }
-    .panel { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px; }
+    .panel { min-width:0; background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px; }
     .panel h2 { font-size:16px; margin:0 0 14px; }
     .notice { padding:10px 12px; background:#fff7e6; border-left:4px solid #e49a16; margin-bottom:14px; }
     .error { background:#ffebee; border-left-color:var(--bad); }
     .stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px; }
     .stat { border:1px solid var(--line); padding:10px; border-radius:6px; }
     .stat strong { display:block; font-size:18px; }
+    .clues > div { min-width:0; }
     .clues { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    .clues pre { margin:0; white-space:pre-wrap; font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace; max-height:420px; overflow:auto; }
+    .clues pre { margin:0; white-space:pre; font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace; max-height:420px; overflow:auto; }
     hr { border:0; border-top:1px solid var(--line); margin:18px 0 14px; }
     .hint-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
     .hint-heading h2 { margin:0; }
@@ -39,13 +40,20 @@
     .hint-reason { color:#31566f; font-size:12px; }
     .hint-count { margin-top:10px; color:#6c8292; font-size:11px; text-align:right; }
     .muted { color:var(--muted); }
-    .board-wrap { overflow:auto; padding:2px 2px 6px; }
+    .board-controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:12px 0; }
+    .board-controls select { padding:5px; }
+    .board-wrap { overflow:auto; padding:0; width:100%; }
+    .board-stage { position:relative; }
+    .puzzle-grid { transform-origin:top left; }
+    .row-clue span { display:inline-block; min-width:18px; text-align:center; }
+    .row-clue { gap:3px; font-variant-numeric:tabular-nums; }
+    .top-clue, .row-clue { font-variant-numeric:tabular-nums; }
     .puzzle-grid { display:grid; width:max-content; background:#fff; border-top:var(--thick) solid #26323b; border-left:var(--thick) solid #26323b; }
     .puzzle-grid > div { min-width:0; min-height:0; border-right:var(--thin) solid var(--line); border-bottom:var(--thin) solid var(--line); }
     .corner { background:#f7f9fa; }
-    .top-clue { height:calc(var(--cell) * 4.5); padding:2px 1px 2px; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; color:#26323b; font:10px/1.05 ui-monospace,SFMono-Regular,Menlo,monospace; }
-    .top-clue span { display:block; min-height:10px; }
-    .row-clue { width:var(--clue-width); height:var(--cell); padding:0 6px 0 3px; display:flex; align-items:center; justify-content:flex-end; color:#26323b; background:#f7f9fa; font:10px ui-monospace,SFMono-Regular,Menlo,monospace; white-space:nowrap; }
+    .top-clue { height:var(--clue-height); padding:2px 1px 2px; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; color:#26323b; font:12px/14px ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .top-clue span { display:block; flex:none; height:14px; line-height:14px; min-height:14px; }
+    .row-clue { width:var(--clue-width); height:var(--cell); padding:0 6px 0 3px; display:flex; align-items:center; justify-content:flex-end; color:#26323b; background:#f7f9fa; font:12px ui-monospace,SFMono-Regular,Menlo,monospace; white-space:nowrap; }
     .cell { width:var(--cell); height:var(--cell); display:flex; align-items:center; justify-content:center; background:#fff; font-weight:700; font-size:12px; }
     .cell.filled { background:#17212b; color:#fff; }
     .cell.empty { color:#d32f2f; background:#fff; font-size:14px; }
@@ -75,6 +83,7 @@
           <h2>识别棋盘</h2>
           <img id="preview" class="preview" alt="已上传图片预览" hidden>
           <div id="notices"></div>
+          <div class="board-controls"><label>棋盘大小 <select id="boardZoom"><option value="fit">适应宽度</option><option value="1">100%</option><option value="1.5">150%</option><option value="2">200%</option></select></label><span id="boardScale" class="muted"></span></div>
           <div id="board"></div>
           <label class="solution-toggle"><input id="showSolution" type="checkbox"> 显示完整解答</label>
         </div>
@@ -122,6 +131,21 @@
     const solutionToggle = document.querySelector('#showSolution');
     const refreshHint = document.querySelector('#refreshHint');
     let data = null, hintIndex = 0;
+    const boardZoom = document.querySelector('#boardZoom');
+    boardZoom.addEventListener('change', fitBoard);
+    new ResizeObserver(fitBoard).observe(document.querySelector('#board'));
+    function fitBoard() {
+      const wrap = document.querySelector('.board-wrap');
+      const grid = document.querySelector('.puzzle-grid');
+      if (!wrap || !grid || !wrap.clientWidth) return;
+      const width = grid.offsetWidth, height = grid.offsetHeight;
+      const scale = boardZoom.value === 'fit' ? Math.min(1, wrap.clientWidth / width) : Number(boardZoom.value);
+      grid.style.transform = `scale(${scale})`;
+      const stage = grid.parentElement;
+      stage.style.width = `${width * scale}px`;
+      stage.style.height = `${height * scale}px`;
+      document.querySelector('#boardScale').textContent = `${Math.round(scale * 100)}% · 可放大查看细节`;
+    }
     file.addEventListener('change', () => {
       run.disabled = !file.files.length;
       download.disabled = true;
@@ -138,7 +162,7 @@
       try {
         const res = await fetch('/api/recognize', {method:'POST', body:form});
         const body = await res.json(); if (!res.ok) throw new Error(body.error || '识别失败');
-        data = body; hintIndex = 0; solutionToggle.checked = false; render(); result.hidden = false;
+        data = body; hintIndex = 0; solutionToggle.checked = false; result.hidden = false; render();
         download.disabled = false; message.textContent = '识别完成';
       } catch (e) { message.textContent = '错误：' + e.message; }
       finally { run.disabled = false; }
@@ -196,7 +220,9 @@
       const wrong = new Set((data.errors || []).map(x => `${x.row-1},${x.col-1}`));
       const selectedHint = data?.hints?.[hintIndex];
       const maxColClue = Math.max(...cols.map(c => c.length), 1);
-      let html = `<div class="board-wrap"><div class="puzzle-grid" style="grid-template-columns:var(--clue-width) repeat(${cols.length},var(--cell))">`;
+      const clueWidth = Math.max(112, ...rows.map(clue => clue.length * 21 + 12));
+      const clueHeight = maxColClue * 14 + 10;
+      let html = `<div class="board-wrap"><div class="board-stage"><div class="puzzle-grid" style="--cell:22px;--clue-width:${clueWidth}px;--clue-height:${clueHeight}px;grid-template-columns:var(--clue-width) repeat(${cols.length},var(--cell));grid-template-rows:${clueHeight}px repeat(${rows.length},var(--cell))">`;
       html += '<div class="corner"></div>';
       html += cols.map((clue, c) => {
         const right = (c + 1) % 5 === 0 && c !== cols.length - 1 ? ' thick-right' : '';
@@ -205,7 +231,7 @@
       }).join('');
       rows.forEach((clue,r) => {
         const bottom = (r + 1) % 5 === 0 && r !== rows.length - 1 ? ' thick-bottom' : '';
-        html += `<div class="row-clue${bottom}">${clue.join(' ')}</div>`;
+        html += `<div class="row-clue${bottom}">${clue.map(x=>`<span>${x}</span>`).join('')}</div>`;
         for (let c=0;c<cols.length;c++) {
           const v = shown[r]?.[c] || '.';
           const cls = v === 'O' ? 'filled' : v === 'X' ? 'empty' : '';
@@ -215,7 +241,8 @@
           html += `<div class="cell ${cls}${bad}${marked}${right}${bottom}">${v === 'O' ? '' : v === 'X' ? '×' : ''}</div>`;
         }
       });
-      board.innerHTML = html + '</div></div>';
+      board.innerHTML = html + '</div></div></div>';
+      fitBoard();
     }
   </script>
 </body>
