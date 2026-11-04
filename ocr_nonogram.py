@@ -538,6 +538,8 @@ _GLYPH_SHIFTS = [(dy, dx)
 _GLYPH_TEMPLATES = None
 
 _FONT_CANDIDATES = [
+    os.path.join(getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))),
+                 "assets", "fonts", "DejaVuSans-Bold.ttf"),
     "/System/Library/Fonts/Supplemental/Verdana Bold.ttf",
     "/System/Library/Fonts/Supplemental/Tahoma Bold.ttf",
     "/System/Library/Fonts/Supplemental/Verdana.ttf",
