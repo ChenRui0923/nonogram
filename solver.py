@@ -1,4 +1,4 @@
-from itertools import product
+from functools import lru_cache
 
 UNKNOWN = "."
 FILLED = "O"
@@ -104,35 +104,76 @@ def line_satisfiable(length, clues, current):
     return length in reachable
 
 
-def solve_line(length, clues, current):
-    """返回一条新线，每个位置为 FILLED/EMPTY（如果所有可行排布一致）或 UNKNOWN。
+@lru_cache(maxsize=8192)
+def _solve_line_cached(length, clues, current):
+    """Traverse the feasible block-placement DAG once for all cell values."""
+    clues = tuple(x for x in clues if x)
+    filled = [0] * (length + 1)
+    empty = [0] * (length + 1)
+    for i, ch in enumerate(current):
+        filled[i + 1] = filled[i] + (ch == FILLED)
+        empty[i + 1] = empty[i] + (ch == EMPTY)
+    remaining = [0] * (len(clues) + 1)
+    for j in range(len(clues) - 1, -1, -1):
+        remaining[j] = remaining[j + 1] + clues[j] + (j + 1 < len(clues))
 
-    若无可行排布返回 None。
-    O(length × num_clues) 判断 + O(length² × num_clues) 逐格确定。
-    对 50×50 约几万次操作，瞬间完成。
-    """
-    # 先检查整体可行性
-    if not line_satisfiable(length, clues, current):
+    @lru_cache(maxsize=None)
+    def transitions(j, pos):
+        if j == len(clues):
+            return ()
+        edges = []
+        for start in range(pos, length - remaining[j] + 1):
+            end = start + clues[j]
+            if filled[start] != filled[pos] or empty[end] != empty[start]:
+                continue
+            next_pos = end + (j + 1 < len(clues))
+            if next_pos > end and current[end] == FILLED:
+                continue
+            if feasible(j + 1, next_pos):
+                edges.append((start, end, next_pos))
+        return tuple(edges)
+
+    @lru_cache(maxsize=None)
+    def feasible(j, pos):
+        if j == len(clues):
+            return filled[length] == filled[pos]
+        return bool(transitions(j, pos))
+
+    if not feasible(0, 0):
         return None
-
-    result = list(current)
-    for i in range(length):
-        if current[i] != UNKNOWN:
+    # Difference arrays accumulate coverage over every reachable feasible edge.
+    black = [0] * (length + 1)
+    white = [0] * (length + 1)
+    pending = [(0, 0)]
+    seen = set()
+    def mark(diff, start, end):
+        diff[start] += 1
+        diff[end] -= 1
+    while pending:
+        j, pos = pending.pop()
+        if (j, pos) in seen:
             continue
-        # 尝试该位置为 EMPTY
-        trial_empty = current[:i] + EMPTY + current[i + 1:]
-        can_empty = line_satisfiable(length, clues, trial_empty)
-        # 尝试该位置为 FILLED
-        trial_filled = current[:i] + FILLED + current[i + 1:]
-        can_filled = line_satisfiable(length, clues, trial_filled)
-
-        if can_filled and not can_empty:
-            result[i] = FILLED
-        elif can_empty and not can_filled:
-            result[i] = EMPTY
-        # else: 两者皆可或皆不可（皆不可不应发生，因为整体可行），保持 UNKNOWN
-
+        seen.add((j, pos))
+        if j == len(clues):
+            mark(white, pos, length)
+            continue
+        for start, end, next_pos in transitions(j, pos):
+            mark(white, pos, start)
+            mark(black, start, end)
+            mark(white, end, next_pos)
+            pending.append((j + 1, next_pos))
+    result = []
+    b = w = 0
+    for i in range(length):
+        b += black[i]
+        w += white[i]
+        result.append(UNKNOWN if b and w else FILLED if b else EMPTY)
     return "".join(result)
+
+
+def solve_line(length, clues, current):
+    """Return the consensus of all feasible placements, or None on conflict."""
+    return _solve_line_cached(length, tuple(clues), current)
 
 
 class Solver:
