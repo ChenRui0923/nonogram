@@ -1,4 +1,4 @@
-# Nonogram 助手
+# nonogram助手
 
 <img src="assets/icons/nonogram.png" alt="Nonogram 应用图标" width="128">
 
@@ -79,7 +79,7 @@ python main.py /path/to/puzzle.json
 
 **为什么有时慢？**程序会依次识别、求解并生成提示。示例 `debug.png` 在开发云环境中识别到页面显示约 4～5 秒，其中优化后的求解和提示约 0.6 秒；不是所有机器或题目的耗时保证。需要大量回溯的题目仍可能更慢，Windows 单文件程序首次解包启动也需要额外时间。
 
-**端口被占用？**关闭之前启动的程序，或从终端指定新端口：Windows 为 `Nonogram.exe --port 9000`；源码 Web 版为 `python web_app.py --port 9000`。
+**端口被占用？**关闭之前启动的程序，或从终端指定新端口：Windows 为 `nonogram助手.exe --port 9000`；源码 Web 版为 `python web_app.py --port 9000`。
 
 ## 从源码运行
 
@@ -146,23 +146,23 @@ PyInstaller 不支持在 Linux 上直接生成 Windows/macOS 原生程序，请�
 ```powershell
 # Windows PowerShell
 .\build_windows.ps1
-# 输出 dist\Nonogram.exe
+# 输出 dist\nonogram助手.exe
 ```
 
 ```bash
 # macOS
 bash build_macos.sh
 bash build_dmg.sh
-# 输出 dist/Nonogram.app 和 dist/Nonogram-macOS.dmg
+# 输出 dist/nonogram助手.app 和 dist/Nonogram-macOS.dmg
 ```
 
 依赖位于 `requirements-build.txt`。打包程序支持无窗口启动检查：
 
 ```bash
 # Windows
-.\dist\Nonogram.exe --smoke-test --port 0
+.\dist\nonogram助手.exe --smoke-test --port 0
 # macOS
-./dist/Nonogram.app/Contents/MacOS/Nonogram --smoke-test --port 0
+./dist/nonogram助手.app/Contents/MacOS/nonogram助手 --smoke-test --port 0
 ```
 
 打包版本的检查日志默认写到系统临时目录 `nonogram-smoke.log`，可通过 `NONOGRAM_STARTUP_LOG` 指定路径；检查不打开 WebView 窗口，验证 HTTP 页面、内置字体和基本求解。完整图形界面、剪贴板和系统安全提示仍需要目标系统实机验收。

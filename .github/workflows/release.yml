@@ -52,7 +52,7 @@ jobs:
         shell: pwsh
         run: |
           $env:NONOGRAM_STARTUP_LOG = Join-Path $env:RUNNER_TEMP 'nonogram-smoke.log'
-          $process = Start-Process -FilePath dist/Nonogram.exe -ArgumentList '--smoke-test', '--port', '0' -PassThru
+          $process = Start-Process -FilePath "dist/nonogram助手.exe" -ArgumentList '--smoke-test', '--port', '0' -PassThru
           try {
             if (-not $process.WaitForExit(180000)) { $process.Kill(); throw 'Bundle smoke test timed out after 180s' }
             if ($process.ExitCode -ne 0) { throw "Bundle smoke test failed: $($process.ExitCode)" }
@@ -71,7 +71,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           python -m PyInstaller --clean --noconfirm nonogram_macos.spec
-          dist/Nonogram.app/Contents/MacOS/Nonogram --smoke-test --port 0
+          "dist/nonogram助手.app/Contents/MacOS/nonogram助手" --smoke-test --port 0
           bash build_dmg.sh
       - name: Package downloads
         shell: bash
@@ -80,7 +80,7 @@ jobs:
         run: |
           mkdir -p release
           if [[ "$RUNNER_OS" == Windows ]]; then
-            cp dist/Nonogram.exe "release/Nonogram-${PLATFORM}.exe"
+            cp dist/nonogram助手.exe "release/Nonogram-${PLATFORM}.exe"
           else
             cp dist/Nonogram-macOS.dmg "release/Nonogram-${PLATFORM}.dmg"
           fi

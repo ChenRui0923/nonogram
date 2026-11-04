@@ -39,7 +39,7 @@ from web_app import HOST, PORT, ThreadingHTTPServer, Handler
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Nonogram OCR")
+    parser = argparse.ArgumentParser(description="nonogram助手")
     parser.add_argument("--host", default=HOST)
     parser.add_argument("--port", default=PORT, type=int)
     parser.add_argument("--no-browser", action="store_true")
@@ -61,7 +61,7 @@ def main():
         try:
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
             with opener.open(url, timeout=10) as response:
-                assert b"Nonogram OCR" in response.read(), "Missing bundled HTML"
+                assert "nonogram助手".encode("utf-8") in response.read(), "Missing bundled HTML"
             print("Checking OCR font templates", flush=True)
             from ocr_nonogram import _glyph_templates
             assert any(key[0] == "DejaVuSans-Bold.ttf" for key in _glyph_templates()), "Missing bundled font"
@@ -87,7 +87,7 @@ def main():
         messagebox = None
 
     if webview is not None:
-        webview.create_window("Nonogram OCR", url, width=1200, height=850,
+        webview.create_window("nonogram助手", url, width=1200, height=850,
                               min_size=(900, 650), confirm_close=True,
                               js_api=ClipboardApi())
         webview.start()
@@ -98,7 +98,7 @@ def main():
     # Some Python distributions (including python.org/Homebrew minimal builds)
     # do not ship Tk. The web app remains fully usable in that case.
     if tk is None:
-        print(f"Nonogram 服务已启动: {url}")
+        print(f"nonogram助手 服务已启动: {url}")
         if not args.no_browser:
             threading.Timer(0.5, open_browser).start()
         try:
@@ -110,10 +110,10 @@ def main():
         return
 
     root = tk.Tk()
-    root.title("Nonogram OCR")
+    root.title("nonogram助手")
     root.geometry("430x220")
     root.resizable(False, False)
-    tk.Label(root, text="Nonogram OCR", font=("Arial", 20, "bold")).pack(pady=(22, 8))
+    tk.Label(root, text="nonogram助手", font=("Arial", 20, "bold")).pack(pady=(22, 8))
     tk.Label(root, text="本地服务正在运行", fg="#16803c", font=("Arial", 12)).pack()
     address = tk.Label(root, text=url, fg="#555", cursor="hand2")
     address.pack(pady=5)
@@ -124,7 +124,7 @@ def main():
               command=lambda: (root.clipboard_clear(), root.clipboard_append(url))).pack(side="left", padx=5)
 
     def close():
-        if messagebox.askyesno("退出 Nonogram", "确定要停止本地服务并退出吗？"):
+        if messagebox.askyesno("退出 nonogram助手", "确定要停止本地服务并退出吗？"):
             server.shutdown()
             root.destroy()
 
