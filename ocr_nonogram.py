@@ -602,7 +602,7 @@ def _glyph_templates():
                 nm = _normalize_glyph(m)
                 if nm is None:
                     continue
-                out[(path.split("/")[-1], d)] = (
+                out[(os.path.basename(path.replace("\\", "/")), d)] = (
                     nm, cv2.distanceTransform((1 - nm).astype(np.uint8), cv2.DIST_L2, 3))
     except Exception:
         out = {}
