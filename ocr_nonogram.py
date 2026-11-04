@@ -533,8 +533,8 @@ def recognize_number_cell(cell_img, debug_path=None):
 
 _GLYPH_CANVAS = (32, 40)
 _GLYPH_SHIFTS = [(dy, dx)
-                 for dy in (-2, -1, 0, 1, 2)
-                 for dx in (-2, -1, 0, 1, 2)]
+                 for dy in (-1, 0, 1)
+                 for dx in (-1, 0, 1)]
 _GLYPH_TEMPLATES = None
 
 _FONT_CANDIDATES = [
@@ -632,6 +632,21 @@ def _glyph_score(a, dt_a, b, dt_b):
     return best
 
 
+def _count_holes(mask):
+    """统计掩码中内部孔洞的数量（'0' 有 1 个，'8' 有 2 个，实心块有 0 个）。"""
+    if mask is None or mask.size == 0:
+        return 0
+    bw = (mask > 0).astype(np.uint8)
+    contours, hierarchy = cv2.findContours(bw, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+    if hierarchy is None:
+        return 0
+    holes = 0
+    for i in range(len(contours)):
+        if hierarchy[0][i][3] != -1:  # has parent → inner contour → hole
+            holes += 1
+    return holes
+
+
 def _recognize_glyph(mask, templates, coarse_limit=8):
     """返回 (digit, score, margin)；识别不出来返回 (None, 9.9, 0)。"""
     nm = _normalize_glyph(mask)
@@ -656,7 +671,49 @@ def _recognize_glyph(mask, templates, coarse_limit=8):
             second = s
     if best_key is None:
         return None, 9.9, 0.0
-    return best_key[1], best_s, second - best_s
+
+    # 拓扑修正：低分辨率下 '0' 归一化后孔洞消失，形似实心椭圆，容易被
+    # 误判为 '8'。两种情况需要纠正：
+    #   1) '8' 应有 2 个孔洞，但掩码只有 0-1 个 → 很可能是 '0'
+    #   2) '8' 的得分偏高（> 0.15，说明匹配并不好），且 '0' 得分接近 → '0'
+    best_digit = best_key[1]
+    if best_digit == 8:
+        holes = _count_holes(mask)
+        # 找 '0' 的最佳得分（遍历全部模板，不受 coarse_limit 限制，
+        # 因为 '0' 的粗略得分可能较差而不在前 N 名中）
+        zero_s = 1e9
+        zero_key = None
+        for key, (tpl, dt_tpl) in templates.items():
+            if key[1] == 0:
+                s = _glyph_score(nm, dt_nm, tpl, dt_tpl)
+                if s < zero_s:
+                    zero_s, zero_key = s, key
+        if zero_key is not None:
+            # 孔洞不足，或 '8' 得分差且 '0' 接近 → 改判 '0'
+            if holes < 2 or (best_s > 0.15 and zero_s - best_s < 0.25):
+                second = best_s
+                best_s, best_key = zero_s, zero_key
+                best_digit = 0
+
+    # 反向修正：'0' 被正确识别但字形实际有 2 个孔洞（即 '8'），且 '8'
+    # 模板得分更好 → 改判 '8'。低分辨率下 '8' 的孔洞可能模糊，使 '0'
+    # 模板粗略得分更优而不在 coarse 候选中，故需遍历全部模板。
+    if best_digit == 0:
+        holes = _count_holes(mask)
+        if holes >= 2:
+            eight_s = 1e9
+            eight_key = None
+            for key, (tpl, dt_tpl) in templates.items():
+                if key[1] == 8:
+                    s = _glyph_score(nm, dt_nm, tpl, dt_tpl)
+                    if s < eight_s:
+                        eight_s, eight_key = s, key
+            if eight_key is not None and eight_s < best_s:
+                second = best_s
+                best_s, best_key = eight_s, eight_key
+                best_digit = 8
+
+    return best_digit, best_s, second - best_s
 
 
 def _ink_mask(bgr):
@@ -706,8 +763,12 @@ def _longest_run(bits):
     return best
 
 
-def _split_touching(mask, x, y, w, h):
-    """粘连的两位数（如 '13'/'10'）沿投影谷值切开。"""
+def _split_touching(mask, x, y, w, h, templates=None):
+    """粘连的两位数（如 '13'/'10'）沿投影谷值切开。
+
+    当投影谷值不够低（两位数字底部相连）或字形明显偏宽时，改用
+    识别引导切割：遍历所有切割位置，选两侧识别得分之和最小的点。
+    """
     if w < h * 0.95:
         return [(mask, x, y, w, h)]
     sub = mask[y:y + h, x:x + w]
@@ -718,8 +779,65 @@ def _split_touching(mask, x, y, w, h):
     if seg.size == 0:
         return [(mask, x, y, w, h)]
     cut = lo + int(np.argmin(seg))
-    if colsum[cut] > 0.30 * max(1, colsum.max()) or cut < 2 or w - cut < 2:
+    # 谷径阈值：谷值占列峰值 30% 以下才认为是真缝隙。
+    # 但若字形明显偏宽（w > 1.3*h，几乎不可能是单数字），即使谷值
+    # 较高也强制切开——两位数底部相连时投影谷值会偏高。
+    force_split = w > h * 1.3
+    if (colsum[cut] > 0.30 * max(1, colsum.max()) and not force_split) or cut < 2 or w - cut < 2:
         return [(mask, x, y, w, h)]
+    # 投影谷值切割可能切到字形内部（如 '0' 的孔洞），产生高得分碎片。
+    # 在切割点附近 ±2 列找真正的最窄处，避免切到字形内部。
+    search_lo = max(1, cut - 2)
+    search_hi = min(w - 1, cut + 3)
+    cut = search_lo + int(np.argmin(colsum[search_lo:search_hi]))
+
+    out = _make_split(mask, x, y, w, h, cut)
+    if len(out) == 2:
+        # 验证切割质量：若任一侧识别得分很高（> 0.3），说明切错了位置
+        # （如切到了 '0' 的孔洞里）。改用识别引导切割。
+        if templates is not None and _split_score(out, templates) > 0.3:
+            guided = _recognition_guided_split(mask, x, y, w, h, templates)
+            if guided:
+                return guided
+        return out
+
+    # 识别引导的回退：若投影切割不成功，遍历所有切割位置，
+    # 选两侧归一化字形得分之和最小的点。
+    if templates is not None:
+        guided = _recognition_guided_split(mask, x, y, w, h, templates)
+        if guided:
+            return guided
+    return [(mask, x, y, w, h)]
+
+
+def _split_score(pieces, templates):
+    """两侧识别得分之和（越高越不像合法切割）。"""
+    total = 0.0
+    for m, px, py, pw, ph in pieces:
+        d, s, _ = _recognize_glyph(m, templates)
+        total += s
+    return total
+
+
+def _recognition_guided_split(mask, x, y, w, h, templates):
+    """遍历所有切割位置，选两侧得分之和最小的切割点。"""
+    best = None
+    for sp in range(3, w - 2):
+        out = _make_split(mask, x, y, w, h, sp)
+        if len(out) != 2:
+            continue
+        score = _split_score(out, templates)
+        if best is None or score < best[0]:
+            best = (score, out)
+    if best and best[0] < 0.35:
+        return best[1]
+    return []
+
+
+def _make_split(mask, x, y, w, h, cut):
+    """在 x+cut 处切割掩码，返回两个子掩码（含各自包围盒）。"""
+    if cut < 2 or cut > w - 2:
+        return []
     out = []
     for keep_left in (True, False):
         m = mask.copy()
@@ -732,10 +850,10 @@ def _split_touching(mask, x, y, w, h):
             continue
         out.append((m, int(xs.min()), int(ys.min()),
                     int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)))
-    return out if len(out) == 2 else [(mask, x, y, w, h)]
+    return out if len(out) == 2 else []
 
 
-def _strip_glyphs(img):
+def _strip_glyphs(img, templates=None):
     bw = _binarize_strip(img)
     h, w = bw.shape
     n, labels, stats, _ = cv2.connectedComponentsWithStats(bw, connectivity=8)
@@ -746,7 +864,7 @@ def _strip_glyphs(img):
             continue
         if ch > h * 0.7:
             continue
-        for piece in _split_touching((labels == i).astype(np.uint8), x, y, cw, ch):
+        for piece in _split_touching((labels == i).astype(np.uint8), x, y, cw, ch, templates):
             if piece[3] > w * 0.7:
                 continue
             comps.append(piece)
@@ -763,7 +881,9 @@ def _group_glyphs(comps, axis):
         for c in comps[1:]:
             prev = groups[-1][-1]
             gap = c[1] - (prev[1] + prev[3])
-            if gap > max(c[4], prev[4]) * 0.55:
+            # 同一数字内两位之间的间距通常很紧（字距 < 0.35×字高），
+            # 不同数字之间间距更宽。用 0.35 而非 0.55 避免把 "4" "10" 合成 "410"。
+            if gap > max(c[4], prev[4]) * 0.35:
                 groups.append([c])
             else:
                 groups[-1].append(c)
@@ -781,9 +901,12 @@ def _group_glyphs(comps, axis):
     return groups
 
 
-def _numbers_in_cell(cell_img, axis, templates):
-    """一小块提示区（一行或一列的一条）里的数字列表。"""
-    groups = _group_glyphs(_strip_glyphs(cell_img), axis)
+def _numbers_in_cell(cell_img, axis, templates, max_value=None):
+    """一小块提示区（一行或一列的一条）里的数字列表。
+
+    max_value：线索最大值（棋盘维度），用于检测并修正粘连分组。
+    """
+    groups = _group_glyphs(_strip_glyphs(cell_img, templates), axis)
     numbers = []
     for group in groups:
         digits = []
@@ -793,8 +916,24 @@ def _numbers_in_cell(cell_img, axis, templates):
                 digits = []
                 break
             digits.append(str(d))
-        if digits:
-            numbers.append(int("".join(digits)))
+        if not digits:
+            continue
+        value = int("".join(digits))
+        # 如果结果超出棋盘维度，尝试在位数边界拆分
+        if max_value and value > max_value and len(digits) > 1:
+            best = None
+            for split_pos in range(1, len(digits)):
+                left = int("".join(digits[:split_pos]))
+                right = int("".join(digits[split_pos:]))
+                if left <= max_value and right <= max_value:
+                    best = (left, right)
+                    break
+            if best:
+                numbers.extend(best)
+            else:
+                numbers.append(value)
+        else:
+            numbers.append(value)
     return numbers
 
 
@@ -807,6 +946,8 @@ def _read_clues_by_glyphs(clue_img, axis, board_grid_lines):
     n_cells = len(board_grid_lines) - 1
     offset = board_grid_lines[0]
     h, w = clue_img.shape[:2]
+    # 线索最大值 = 棋盘维度，用于检测粘连分组
+    max_value = n_cells
     clues = []
     for i in range(n_cells):
         a = max(0, board_grid_lines[i] - offset + 1)
@@ -815,7 +956,7 @@ def _read_clues_by_glyphs(clue_img, axis, board_grid_lines):
             clues.append([])
             continue
         cell = clue_img[a:b, :] if axis == 1 else clue_img[:, a:b]
-        clues.append(_numbers_in_cell(cell, "x" if axis == 1 else "y", templates))
+        clues.append(_numbers_in_cell(cell, "x" if axis == 1 else "y", templates, max_value=max_value))
     return clues
 
 
@@ -1119,6 +1260,14 @@ def validate_and_fix(data):
 
     for c in range(ncols):
         col_clues[c] = [cc for cc in col_clues[c] if 0 < cc <= nrows]
+
+    # 行列线索总和必须相等（每个黑格在行和列各计一次）。不等说明 OCR 有误，
+    # 打印警告便于调试，但不自动修正——无法确定是哪一行的错。
+    row_sum = sum(sum(r) for r in row_clues)
+    col_sum = sum(sum(c) for c in col_clues)
+    if row_sum != col_sum:
+        print(f"[validate_and_fix] 警告：行线索总和({row_sum}) ≠ 列线索总和({col_sum})，"
+              f"差值{row_sum - col_sum}，可能存在 OCR 识别错误")
 
     if current:
         fixed = []

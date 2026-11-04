@@ -1,7 +1,7 @@
 import time
 from itertools import combinations
 
-from solver import Solver, generate_patterns, compatible, UNKNOWN, FILLED, EMPTY
+from solver import Solver, generate_patterns, compatible, line_satisfiable, solve_line, UNKNOWN, FILLED, EMPTY
 
 
 def conflicting_line(row_clues, col_clues, current):
@@ -12,37 +12,27 @@ def conflicting_line(row_clues, col_clues, current):
     nrows = len(current)
     ncols = len(current[0]) if nrows else 0
     board = [list(x) for x in current]
-    rpat = [generate_patterns(ncols, rc) for rc in row_clues]
-    cpat = [generate_patterns(nrows, cc) for cc in col_clues]
 
     changed = True
     while changed:
         changed = False
         for r in range(nrows):
-            cand = [p for p in rpat[r] if compatible(p, "".join(board[r]))]
-            if not cand:
+            solved = solve_line(ncols, row_clues[r], "".join(board[r]))
+            if solved is None:
                 return ("row", r)
-            rpat[r] = cand
             for c in range(ncols):
-                vals = {p[c] for p in cand}
-                if len(vals) == 1:
-                    v = vals.pop()
-                    if board[r][c] != v:
-                        board[r][c] = v
-                        changed = True
+                if solved[c] != UNKNOWN and board[r][c] != solved[c]:
+                    board[r][c] = solved[c]
+                    changed = True
         for c in range(ncols):
             line = "".join(board[r][c] for r in range(nrows))
-            cand = [p for p in cpat[c] if compatible(p, line)]
-            if not cand:
+            solved = solve_line(nrows, col_clues[c], line)
+            if solved is None:
                 return ("col", c)
-            cpat[c] = cand
             for r in range(nrows):
-                vals = {p[r] for p in cand}
-                if len(vals) == 1:
-                    v = vals.pop()
-                    if board[r][c] != v:
-                        board[r][c] = v
-                        changed = True
+                if solved[r] != UNKNOWN and board[r][c] != solved[r]:
+                    board[r][c] = solved[r]
+                    changed = True
     return None
 
 
@@ -88,18 +78,16 @@ def find_conflicts(row_clues, col_clues, current, solution, unique,
 
 
 def get_line_reasoning(clues, line, line_idx, axis):
-    patterns = generate_patterns(len(line), clues)
-    compatible_pats = [p for p in patterns if compatible(p, line)]
+    length = len(line)
+    solved = solve_line(length, clues, line)
 
-    if not compatible_pats:
+    if solved is None:
         return None, None, "矛盾：该行/列没有可行的模式"
 
     definite_positions = {}
-    for i in range(len(line)):
-        if line[i] == UNKNOWN:
-            vals = {p[i] for p in compatible_pats}
-            if len(vals) == 1:
-                definite_positions[i] = vals.pop()
+    for i in range(length):
+        if line[i] == UNKNOWN and solved[i] != UNKNOWN:
+            definite_positions[i] = solved[i]
 
     if definite_positions:
         reasoning_parts = []
@@ -109,7 +97,7 @@ def get_line_reasoning(clues, line, line_idx, axis):
 
         pos, val = next(iter(definite_positions.items()))
 
-        overlap = _find_overlap_reason(clues, line, len(line))
+        overlap = _find_overlap_reason(clues, line, length)
         if overlap:
             reason = f"交叠法：提示[{clue_str}]中{overlap}"
         else:
@@ -238,9 +226,7 @@ def validate_current_board(current, row_clues, col_clues):
     for r in range(nrows):
         line = current[r]
         clues = row_clues[r] if r < len(row_clues) else []
-        patterns = generate_patterns(ncols, clues)
-        compatible_pats = [p for p in patterns if compatible(p, line)]
-        if not compatible_pats:
+        if not line_satisfiable(ncols, clues, line):
             issues.append({
                 "type": "row_conflict",
                 "idx": r + 1,
@@ -250,9 +236,7 @@ def validate_current_board(current, row_clues, col_clues):
     for c in range(ncols):
         line = "".join(current[r][c] for r in range(nrows))
         clues = col_clues[c] if c < len(col_clues) else []
-        patterns = generate_patterns(nrows, clues)
-        compatible_pats = [p for p in patterns if compatible(p, line)]
-        if not compatible_pats:
+        if not line_satisfiable(nrows, clues, line):
             issues.append({
                 "type": "col_conflict",
                 "idx": c + 1,

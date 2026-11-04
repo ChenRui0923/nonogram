@@ -32,24 +32,31 @@ def collect_hints(current, solution, rows, cols):
 
     nrows = len(rows)
     ncols = len(cols)
+
+    # Pre-compute line reasoning once per row and per column (not per cell).
+    row_reasons = []
+    for r in range(nrows):
+        row_reasons.append(get_line_reasoning(rows[r], current[r], r, 0))
+    col_lines = ["".join(current[rr][c] for rr in range(nrows)) for c in range(ncols)]
+    col_reasons = []
+    for c in range(ncols):
+        col_reasons.append(get_line_reasoning(cols[c], col_lines[c], c, 1))
+
+    # Pre-compute per-column done counts once.
+    col_done_by_c = [
+        sum(current[rr][c] != UNKNOWN for rr in range(nrows))
+        for c in range(ncols)
+    ]
+
     candidates = []
     for r in range(nrows):
         row_done = sum(ch != UNKNOWN for ch in current[r])
-        col_done_by_c = [
-            sum(current[rr][c] != UNKNOWN for rr in range(nrows))
-            for c in range(ncols)
-        ]
+        row_pos, row_value, row_reason = row_reasons[r]
         for c in range(ncols):
             if current[r][c] != UNKNOWN or solution[r][c] == UNKNOWN:
                 continue
 
-            row_pos, row_value, row_reason = get_line_reasoning(
-                rows[r], current[r], r, 0
-            )
-            col_line = "".join(current[rr][c] for rr in range(nrows))
-            col_pos, col_value, col_reason = get_line_reasoning(
-                cols[c], col_line, c, 1
-            )
+            col_pos, col_value, col_reason = col_reasons[c]
 
             if row_pos == c:
                 reason = f"第{r + 1}行: {row_reason}"
