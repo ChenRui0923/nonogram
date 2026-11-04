@@ -245,3 +245,37 @@ python3 ocr_selftest.py Screenshots/PixPin_2026-09-24_17-31-14.png puzzle_gpt.js
 ```
 
 会分别报告行提示、列提示、当前棋盘的逐项差异和准确率，退出码非 0 表示存在不一致。
+
+## 下载桌面版与发布版本
+
+正式版本位于 [GitHub Releases](https://github.com/ChenRui0923/nonogram/releases)：
+
+| 系统 | 下载文件 |
+| --- | --- |
+| Windows 10/11 x64 | `Nonogram-windows-x64.exe` |
+| macOS Apple Silicon（M 系列） | `Nonogram-macos-arm64.dmg` |
+| macOS Intel | `Nonogram-macos-x64.dmg` |
+
+无需安装 Python。Windows 需要 Edge WebView2 Runtime；macOS 打开 DMG 后将 App 拖入 Applications。当前发布流程没有开发者证书签名或 Apple 公证，首次运行可能出现系统安全提示。字体模板随应用分发，不要求用户安装字体或 Tesseract。图片的字体、清晰度和裁剪仍会影响 OCR。
+
+维护者发布新版本：
+
+```bash
+# 提交代码后，推送 main 和版本标签（例：首版 v0.1.0）
+git push origin HEAD:main
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+GitHub Actions 会先运行回归测试，再分别在 Windows、Intel Mac 和 Apple Silicon Mac 上打包，验证打包程序能启动 HTTP 服务、读取 HTML 和内置字体，并运行求解器。全部成功后才创建 Release 并上传三个下载包、依赖版本清单与 `SHA256SUMS.txt`。macOS/Windows 的完整图形界面及剪贴板仍需要实机验收。
+
+也可在 Actions → Desktop builds and releases → Run workflow 手动构建；这种方式只生成可下载的 Actions artifacts，不发布正式版本。需要仓库启用 GitHub Actions，并允许发布任务使用 `GITHUB_TOKEN` 写入 Releases。
+
+本地打包后可运行无窗口启动检查：
+
+```bash
+# Windows
+.\dist\Nonogram.exe --smoke-test --port 0
+# macOS
+./dist/Nonogram.app/Contents/MacOS/Nonogram --smoke-test --port 0
+```

@@ -1,0 +1,115 @@
+name: Desktop builds and releases
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install opencv-python numpy pillow pytesseract
+      - run: python -B -m unittest discover -s tests -v
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows-x64
+          - os: macos-15-intel
+            platform: macos-x64
+          - os: macos-15
+            platform: macos-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-build.txt
+      - run: python -m pip install -r requirements-build.txt
+      - name: Record dependencies
+        run: python -m pip freeze > build-dependencies.txt
+      - name: Build Windows executable
+        if: runner.os == 'Windows'
+        run: python -m PyInstaller --clean --noconfirm nonogram.spec
+      - name: Test bundled Windows application
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $process = Start-Process -FilePath dist/Nonogram.exe -ArgumentList '--smoke-test', '--port', '0' -PassThru
+          if (-not $process.WaitForExit(60000)) { $process.Kill(); throw 'Bundle smoke test timed out' }
+          if ($process.ExitCode -ne 0) { throw "Bundle smoke test failed: $($process.ExitCode)" }
+      - name: Build and test macOS application
+        if: runner.os == 'macOS'
+        run: |
+          python -m PyInstaller --clean --noconfirm nonogram_macos.spec
+          dist/Nonogram.app/Contents/MacOS/Nonogram --smoke-test --port 0
+          bash build_dmg.sh
+      - name: Package downloads
+        shell: bash
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          mkdir -p release
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            cp dist/Nonogram.exe "release/Nonogram-${PLATFORM}.exe"
+          else
+            cp dist/Nonogram-macOS.dmg "release/Nonogram-${PLATFORM}.dmg"
+          fi
+          cp build-dependencies.txt "release/dependencies-${PLATFORM}.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Nonogram-${{ matrix.platform }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Publish release with checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          cd release
+          sha256sum *.exe *.dmg > SHA256SUMS.txt
+          cat > notes.md <<'NOTES'
+          ## 下载
+          - Windows 10/11 x64：Nonogram-windows-x64.exe（需要 Edge WebView2 Runtime）。
+          - Apple Silicon (M 系列)：Nonogram-macos-arm64.dmg。
+          - Intel Mac：Nonogram-macos-x64.dmg。
+
+          无需安装 Python。macOS 请将 App 拖入 Applications。
+          本版本未使用开发者证书签名/Apple 公证，系统可能显示未知开发者提示；请按系统安全设置授权打开。
+          OCR 使用内置字体模板，无需安装 Tesseract；特殊截图仍可能识别失败。
+          SHA256SUMS.txt 用于核对下载完整性，dependencies 文件记录各平台实际打包依赖。
+          NOTES
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" ./*.exe ./*.dmg SHA256SUMS.txt dependencies-*.txt --clobber
+          else
+            gh release create "$RELEASE_TAG" ./*.exe ./*.dmg SHA256SUMS.txt dependencies-*.txt --title "Nonogram $RELEASE_TAG" --notes-file notes.md
+          fi

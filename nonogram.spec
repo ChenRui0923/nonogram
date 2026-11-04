@@ -1,7 +1,7 @@
 # Build with: pyinstaller --clean nonogram.spec
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
-datas = [("web_index.html", ".")]
+datas = [("web_index.html", "."), ("assets/fonts", "assets/fonts")]
 hiddenimports = ["cv2", "numpy", "PIL", "pytesseract", "webview"]
 hiddenimports += collect_submodules("cv2")
 

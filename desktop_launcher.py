@@ -53,10 +53,11 @@ def main():
     parser.add_argument("--host", default=HOST)
     parser.add_argument("--port", default=PORT, type=int)
     parser.add_argument("--no-browser", action="store_true")
+    parser.add_argument("--smoke-test", action="store_true", help="Check bundled resources and HTTP startup without opening a window")
     args = parser.parse_args()
 
     server = ThreadingHTTPServer((args.host, args.port), Handler)
-    url = f"http://{args.host}:{args.port}"
+    url = f"http://{args.host}:{server.server_address[1]}"
     threading.Thread(target=server.serve_forever, daemon=True).start()
 
     def open_browser():
@@ -64,6 +65,20 @@ def main():
             subprocess.Popen(["open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         else:
             webbrowser.open(url)
+
+    if args.smoke_test:
+        try:
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            with opener.open(url, timeout=10) as response:
+                assert b"Nonogram OCR" in response.read(), "Missing bundled HTML"
+            from ocr_nonogram import _glyph_templates
+            assert any(key[0] == "DejaVuSans-Bold.ttf" for key in _glyph_templates()), "Missing bundled font"
+            from solver import Solver
+            assert Solver([[1]], [[1]]).solve() == [["O"]], "Solver failed"
+        finally:
+            server.shutdown()
+            server.server_close()
+        return
 
     if webview is not None:
         webview.create_window("Nonogram OCR", url, width=1200, height=850,
